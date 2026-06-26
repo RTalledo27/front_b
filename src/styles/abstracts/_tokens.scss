@@ -1,0 +1,117 @@
+:root {
+  color-scheme: light;
+
+  --color-primary-950: #081426;
+  --color-primary-900: #0f1f35;
+  --color-primary-800: #172c46;
+  --color-primary-700: #203b5b;
+  --color-primary-100: #e8f0f8;
+  --color-primary-50: #f1f6fb;
+
+  --color-accent-600: #d99a00;
+  --color-accent-500: #f2b514;
+  --color-accent-400: #ffc83d;
+  --color-accent-100: #fff3c4;
+
+  --color-neutral-950: #0b1220;
+  --color-neutral-900: #172033;
+  --color-neutral-800: #253247;
+  --color-neutral-700: #435168;
+  --color-neutral-600: #64748b;
+  --color-neutral-500: #7b899d;
+  --color-neutral-300: #d9e1ec;
+  --color-neutral-200: #e8edf4;
+  --color-neutral-100: #f3f6fa;
+  --color-neutral-50: #f8fafc;
+  --color-white: #ffffff;
+
+  --color-success-50: #edf8f2;
+  --color-success: #16834b;
+  --color-warning-50: #fff7e8;
+  --color-warning: #d97706;
+  --color-danger-50: #fff1f1;
+  --color-danger: #c93b3b;
+  --color-info-50: #eff6ff;
+  --color-info: #2563eb;
+
+  --color-brand: #4f46e5;
+  --color-brand-hover: #4338ca;
+  --color-brand-strong: #312e81;
+  --color-brand-contrast: var(--color-white);
+  --color-brand-subtle: #eef2ff;
+  --color-brand-muted: #e0e7ff;
+  --color-brand-halo: rgb(99 102 241 / 0.16);
+  --color-dark-section: var(--color-primary-950);
+  --color-dark-section-soft: var(--color-primary-900);
+  --color-dark-section-contrast: var(--color-white);
+  --color-prize: var(--color-accent-500);
+  --color-prize-hover: var(--color-accent-400);
+  --color-prize-strong: var(--color-accent-600);
+  --color-prize-subtle: var(--color-accent-100);
+  --color-action-primary: var(--color-brand);
+  --color-action-primary-hover: var(--color-brand-hover);
+  --color-action-primary-text: var(--color-brand-contrast);
+  --color-action-prize: var(--color-prize);
+  --color-action-prize-hover: var(--color-prize-hover);
+  --color-action-prize-text: var(--color-primary-950);
+  --color-surface: var(--color-white);
+  --color-surface-subtle: var(--color-neutral-100);
+  --color-background: var(--color-neutral-50);
+  --color-text: var(--color-neutral-950);
+  --color-text-muted: var(--color-neutral-600);
+  --color-border: var(--color-neutral-200);
+  --color-link: var(--color-brand);
+  --color-link-hover: var(--color-brand-hover);
+  --color-focus-ring: rgb(79 70 229 / 0.28);
+
+  /* Compatibility aliases while components migrate to semantic tokens. */
+  --primary-50: var(--color-brand-subtle);
+  --primary-100: var(--color-brand-muted);
+  --primary-500: var(--color-brand);
+  --primary-600: var(--color-brand);
+  --primary-700: var(--color-brand-hover);
+  --primary-900: var(--color-brand-strong);
+  --accent-100: var(--color-prize-subtle);
+  --accent-400: var(--color-accent-400);
+  --accent-700: #8b5e00;
+  --success-50: var(--color-success-50);
+  --success-600: var(--color-success);
+  --danger-50: var(--color-danger-50);
+  --danger-600: var(--color-danger);
+  --info-50: var(--color-info-50);
+  --info-600: var(--color-info);
+  --white: var(--color-white);
+  --neutral-50: var(--color-neutral-50);
+  --neutral-100: var(--color-neutral-100);
+  --neutral-200: var(--color-neutral-200);
+  --neutral-300: var(--color-neutral-300);
+  --neutral-500: var(--color-neutral-500);
+  --neutral-600: var(--color-neutral-600);
+  --neutral-700: var(--color-neutral-700);
+  --neutral-800: var(--color-neutral-800);
+  --neutral-900: var(--color-neutral-950);
+
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --xs: 0.75rem;
+  --sm: 0.875rem;
+  --base: 1rem;
+  --lg: 1.125rem;
+  --xl: 1.25rem;
+  --2xl: clamp(1.5rem, 4vw, 2rem);
+  --3xl: clamp(2rem, 6vw, 3.25rem);
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.25rem;
+  --s6: 1.5rem;
+  --s8: 2rem;
+  --s10: 2.5rem;
+  --r-sm: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.5rem;
+  --shadow: 0 16px 40px rgb(8 20 38 / 0.08);
+  --focus: 0 0 0 3px var(--color-focus-ring);
+  --content: 78rem;
+}
