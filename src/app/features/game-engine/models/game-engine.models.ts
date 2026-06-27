@@ -31,6 +31,15 @@ export interface GameEngineWinnerView {
   wonAt: string;
 }
 
+export interface GameEngineStartCommandView {
+  gameId: string;
+  status: string;
+  outcome: 'started' | 'already_started';
+  scheduledStartAt: string;
+  startedAt: string;
+  confirmedEntriesCount: number;
+}
+
 export interface GameEngineConsoleView {
   context: AdminGameDetailView;
   draws: GameEngineDrawView[];
@@ -39,6 +48,17 @@ export interface GameEngineConsoleView {
 }
 
 export type GameEngineAccessMode = 'contextual' | 'manual';
+
+export type GameEngineStartStatus =
+  | 'idle'
+  | 'submitting'
+  | 'success'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'notFound'
+  | 'invalidState'
+  | 'networkError'
+  | 'unexpectedError';
 
 export type GameEnginePageStatus =
   | 'idle'

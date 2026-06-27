@@ -7,6 +7,7 @@ import { buildAdminGameNumberStatus } from '../../admin-games/utils/admin-games-
 import {
   GameEngineCounterView,
   GameEngineDrawView,
+  GameEngineStartCommandView,
   GameEngineWinnerView,
 } from '../models/game-engine.models';
 
@@ -34,6 +35,14 @@ export function mapGameEngineWinnerResponse(response: unknown): GameEngineWinner
   }
 
   return mapGameEngineWinner(response.data);
+}
+
+export function mapGameEngineStartResponse(response: unknown): GameEngineStartCommandView {
+  if (!isDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return mapGameEngineStart(response.data);
 }
 
 export function isGameEngineInvalidPayloadError(error: unknown): boolean {
@@ -81,6 +90,24 @@ function mapGameEngineWinner(payload: unknown): GameEngineWinnerView {
     winningHits: readNumber(record['winning_hits']),
     userId: readNumber(record['user_id']),
     wonAt: readIsoDate(record['won_at']),
+  };
+}
+
+function mapGameEngineStart(payload: unknown): GameEngineStartCommandView {
+  const record = readRecord(payload);
+  const outcome = readString(record['outcome']);
+
+  if (outcome !== 'started' && outcome !== 'already_started') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return {
+    gameId: readString(record['game_id']),
+    status: readString(record['status']),
+    outcome,
+    scheduledStartAt: readIsoDate(record['scheduled_start_at']),
+    startedAt: readIsoDate(record['started_at']),
+    confirmedEntriesCount: readNumber(record['confirmed_entries_count']),
   };
 }
 

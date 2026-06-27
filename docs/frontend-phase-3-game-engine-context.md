@@ -189,3 +189,7 @@ Smoke deseado:
 ## Siguiente bloque
 
 Recomendado: primera mutación administrativa de motor.
+
+Continuidad implementada en Fase 3.4:
+
+- ver `docs/frontend-phase-3-engine-first-mutation.md`.

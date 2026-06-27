@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
@@ -11,6 +21,9 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
   selector: 'app-game-engine-page',
   imports: [ReactiveFormsModule, RouterLink, StatusBadge],
   providers: [GameEngineFacade],
+  host: {
+    '(keydown.escape)': 'closeStartConfirmation()',
+  },
   template: `
     <section class="page game-engine-page">
       <header class="page-header">
@@ -18,8 +31,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           <p class="eyebrow">Motor administrativo</p>
           <h1>Consola contextual del juego</h1>
           <p>
-            Esta fase deja la consola en modo lectura, usando el UUID real del juego y los endpoints
-            administrativos auditados del backend.
+            Esta fase habilita una sola mutación auditada del motor usando el UUID real del juego y
+            manteniendo el resto de operaciones fuera de alcance.
           </p>
         </div>
       </header>
@@ -106,9 +119,75 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           </app-status-badge>
         </section>
 
+        @if (canStartGame()) {
+          <section class="surface-card start-panel" aria-live="polite">
+            <div class="start-panel__header">
+              <div>
+                <h3>Primera mutación habilitada</h3>
+                <p>
+                  El backend permite iniciar el juego desde ventas cerradas cuando pasa las validaciones
+                  reales de readiness.
+                </p>
+              </div>
+              <button
+                #openStartButton
+                class="button"
+                type="button"
+                [disabled]="facade.startStatus() === 'submitting'"
+                (click)="openStartConfirmation()"
+              >
+                {{ facade.startStatus() === 'submitting' ? 'Iniciando…' : 'Iniciar juego' }}
+              </button>
+            </div>
+
+            @if (showStartConfirmation()) {
+              <div class="confirm-box" role="alertdialog" aria-labelledby="start-confirm-title" aria-modal="false">
+                <h4 id="start-confirm-title">Confirmar inicio del juego</h4>
+                <p>
+                  Esta acción cambia el estado del bingo a ejecución. Se usará el UUID real del contexto y
+                  no se enviará ninguna otra mutación.
+                </p>
+                <div class="confirm-box__actions">
+                  <button
+                    #confirmStartButton
+                    class="button"
+                    type="button"
+                    [disabled]="facade.startStatus() === 'submitting'"
+                    (click)="startGame()"
+                  >
+                    Confirmar inicio
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="facade.startStatus() === 'submitting'"
+                    (click)="closeStartConfirmation()"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (facade.startStatus() === 'success' && facade.startResult(); as startResult) {
+              <p class="feedback feedback--success" role="status">
+                {{
+                  startResult.outcome === 'already_started'
+                    ? 'El backend confirmó que el juego ya estaba iniciado.'
+                    : 'El juego se inició correctamente y el contexto se está refrescando.'
+                }}
+              </p>
+            } @else if (facade.startError()) {
+              <p class="feedback feedback--error" role="alert">
+                {{ startErrorMessage() }}
+              </p>
+            }
+          </section>
+        }
+
         <p class="read-only-note" aria-live="polite">
-          Esta integración es read-only. Las mutaciones del motor quedan fuera de Fase 3.3 hasta una
-          auditoría específica.
+          Solo se habilitó la mutación auditada para iniciar el juego. Pausa, resume, draw y rebuild
+          siguen fuera de este bloque.
         </p>
 
         <div class="summary-grid">
@@ -221,7 +300,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
     }
     .data-state,
     .hero,
-    .panel {
+    .panel,
+    .start-panel {
       padding: var(--s5);
     }
     .manual-form {
@@ -264,8 +344,48 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
     }
     .hero h2,
     .hero p,
-    .panel h3 {
+    .panel h3,
+    .start-panel h3,
+    .start-panel p {
       margin-top: 0;
+    }
+    .start-panel {
+      display: grid;
+      gap: var(--s3);
+    }
+    .start-panel__header {
+      display: flex;
+      gap: var(--s4);
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .confirm-box {
+      padding: var(--s4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--neutral-50);
+    }
+    .confirm-box h4,
+    .confirm-box p {
+      margin-top: 0;
+    }
+    .confirm-box__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s3);
+    }
+    .feedback {
+      margin: 0;
+      padding: var(--s3);
+      border-radius: var(--r-md);
+    }
+    .feedback--success {
+      background: #ecfdf3;
+      color: #067647;
+    }
+    .feedback--error {
+      background: #fff1f0;
+      color: #b42318;
     }
     .read-only-note {
       margin: 0;
@@ -343,7 +463,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       .context-actions,
       .hero,
       .facts div,
-      .counter-number {
+      .counter-number,
+      .start-panel__header {
         grid-template-columns: 1fr;
         display: grid;
       }
@@ -358,14 +479,39 @@ export class GameEnginePage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly openStartButton = viewChild<ElementRef<HTMLButtonElement>>('openStartButton');
+  private readonly confirmStartButton = viewChild<ElementRef<HTMLButtonElement>>('confirmStartButton');
 
   readonly facade = inject(GameEngineFacade);
   readonly manualGameId = new FormControl('', { nonNullable: true });
   readonly date = formatGameDate;
   readonly winner = computed(() => this.facade.snapshot()?.winner ?? this.fallbackWinner());
+  readonly canStartGame = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    if (context.status.value !== 'sales_closed') {
+      return false;
+    }
+
+    if (context.lifecycle.startedAt !== null || context.schedule.scheduledStartAt === null) {
+      return false;
+    }
+
+    return Date.parse(context.schedule.scheduledStartAt) <= Date.now();
+  });
+  readonly showStartConfirmation = signal(false);
   backQueryParams: Params = {};
 
   constructor() {
+    effect(() => {
+      if (this.showStartConfirmation()) {
+        this.confirmStartButton()?.nativeElement.focus();
+      }
+    });
+
     combineLatest([this.route.paramMap, this.route.queryParamMap])
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(([paramMap, queryParamMap]) => {
@@ -397,6 +543,41 @@ export class GameEnginePage {
     this.router.navigate(['/admin/motor'], { queryParams: { gameId } });
   }
 
+  openStartConfirmation(): void {
+    if (!this.canStartGame() || this.facade.startStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(true);
+  }
+
+  closeStartConfirmation(): void {
+    if (!this.showStartConfirmation() || this.facade.startStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(false);
+    this.openStartButton()?.nativeElement.focus();
+  }
+
+  startGame(): void {
+    this.showStartConfirmation.set(false);
+    this.facade.startGame();
+  }
+
+  startErrorMessage(): string {
+    const error = this.facade.startError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.startStatus() === 'invalidState') {
+      return 'Laravel rechazó el inicio del juego por estado o readiness actual. Revisa el contexto y vuelve a intentarlo.';
+    }
+
+    return error.message;
+  }
+
   private loadFromRoute(routeGameId: string, queryGameId: string): void {
     const resolvedGameId = routeGameId || queryGameId;
 
@@ -405,6 +586,7 @@ export class GameEnginePage {
       return;
     }
 
+    this.showStartConfirmation.set(false);
     this.facade.load(resolvedGameId, routeGameId !== '' ? 'contextual' : 'manual');
   }
 

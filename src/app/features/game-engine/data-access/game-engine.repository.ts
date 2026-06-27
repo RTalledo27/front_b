@@ -9,11 +9,13 @@ import {
 import {
   GameEngineCounterView,
   GameEngineDrawView,
+  GameEngineStartCommandView,
   GameEngineWinnerView,
 } from '../models/game-engine.models';
 import {
   mapGameEngineCountersResponse,
   mapGameEngineDrawsResponse,
+  mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
 } from './game-engine.mapper';
 
@@ -21,6 +23,7 @@ export interface GameEngineRepository {
   listDraws(gameId: string): Observable<GameEngineDrawView[]>;
   listCounters(gameId: string): Observable<GameEngineCounterView[]>;
   getWinner(gameId: string): Observable<GameEngineWinnerView>;
+  startGame(gameId: string): Observable<GameEngineStartCommandView>;
 }
 
 export const GAME_ENGINE_REPOSITORY = new InjectionToken<GameEngineRepository>(
@@ -56,5 +59,14 @@ export class HttpGameEngineRepository implements GameEngineRepository {
         `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/winner`,
       )
       .pipe(map(mapGameEngineWinnerResponse));
+  }
+
+  startGame(gameId: string): Observable<GameEngineStartCommandView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/start`,
+        null,
+      )
+      .pipe(map(mapGameEngineStartResponse));
   }
 }

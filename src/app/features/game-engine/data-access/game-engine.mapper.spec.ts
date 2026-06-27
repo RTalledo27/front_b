@@ -2,6 +2,7 @@ import {
   isGameEngineInvalidPayloadError,
   mapGameEngineCountersResponse,
   mapGameEngineDrawsResponse,
+  mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
 } from './game-engine.mapper';
 
@@ -90,8 +91,69 @@ describe('game-engine.mapper', () => {
     });
   });
 
+  it('maps the start command resource envelope', () => {
+    const result = mapGameEngineStartResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'running',
+        outcome: 'started',
+        scheduled_start_at: '2026-06-27T12:00:00Z',
+        started_at: '2026-06-27T12:05:00Z',
+        confirmed_entries_count: 12,
+      },
+    });
+
+    expect(result).toEqual({
+      gameId: 'game-1',
+      status: 'running',
+      outcome: 'started',
+      scheduledStartAt: '2026-06-27T12:00:00Z',
+      startedAt: '2026-06-27T12:05:00Z',
+      confirmedEntriesCount: 12,
+    });
+  });
+
+  it('maps the start replay resource envelope', () => {
+    const result = mapGameEngineStartResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'running',
+        outcome: 'already_started',
+        scheduled_start_at: '2026-06-27T12:00:00Z',
+        started_at: '2026-06-27T12:05:00Z',
+        confirmed_entries_count: 12,
+      },
+    });
+
+    expect(result.outcome).toBe('already_started');
+  });
+
   it('rejects malformed payloads', () => {
     expect(() => mapGameEngineCountersResponse({ data: {}, meta: null })).toThrowError();
+    expect(() =>
+      mapGameEngineStartResponse({
+        data: {
+          game_id: 'game-1',
+          status: 'running',
+          outcome: 'unknown_outcome',
+          scheduled_start_at: '2026-06-27T12:00:00Z',
+          started_at: '2026-06-27T12:05:00Z',
+          confirmed_entries_count: 12,
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineStartResponse({
+        data: {
+          game_id: 'game-1',
+          status: 'running',
+          outcome: 'started',
+          scheduled_start_at: null,
+          started_at: '2026-06-27T12:05:00Z',
+          confirmed_entries_count: 12,
+        },
+      }),
+    ).toThrowError();
 
     try {
       mapGameEngineCountersResponse({ data: {}, meta: null });
