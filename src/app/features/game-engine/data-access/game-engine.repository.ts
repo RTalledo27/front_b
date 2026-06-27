@@ -8,13 +8,19 @@ import {
 } from '../../../core/api/models/api-response.models';
 import {
   GameEngineCounterView,
+  GameEngineDrawCommandView,
   GameEngineDrawView,
+  GameEnginePauseCommandView,
+  GameEngineResumeCommandView,
   GameEngineStartCommandView,
   GameEngineWinnerView,
 } from '../models/game-engine.models';
 import {
   mapGameEngineCountersResponse,
+  mapGameEngineDrawCommandResponse,
   mapGameEngineDrawsResponse,
+  mapGameEnginePauseResponse,
+  mapGameEngineResumeResponse,
   mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
 } from './game-engine.mapper';
@@ -24,6 +30,9 @@ export interface GameEngineRepository {
   listCounters(gameId: string): Observable<GameEngineCounterView[]>;
   getWinner(gameId: string): Observable<GameEngineWinnerView>;
   startGame(gameId: string): Observable<GameEngineStartCommandView>;
+  pauseGame(gameId: string): Observable<GameEnginePauseCommandView>;
+  resumeGame(gameId: string): Observable<GameEngineResumeCommandView>;
+  drawNumber(gameId: string, commandId: string): Observable<GameEngineDrawCommandView>;
 }
 
 export const GAME_ENGINE_REPOSITORY = new InjectionToken<GameEngineRepository>(
@@ -68,5 +77,37 @@ export class HttpGameEngineRepository implements GameEngineRepository {
         null,
       )
       .pipe(map(mapGameEngineStartResponse));
+  }
+
+  pauseGame(gameId: string): Observable<GameEnginePauseCommandView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/pause`,
+        null,
+      )
+      .pipe(map(mapGameEnginePauseResponse));
+  }
+
+  resumeGame(gameId: string): Observable<GameEngineResumeCommandView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/resume`,
+        null,
+      )
+      .pipe(map(mapGameEngineResumeResponse));
+  }
+
+  drawNumber(gameId: string, commandId: string): Observable<GameEngineDrawCommandView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/draws`,
+        null,
+        {
+          headers: {
+            'X-Draw-Command-Id': commandId,
+          },
+        },
+      )
+      .pipe(map(mapGameEngineDrawCommandResponse));
   }
 }

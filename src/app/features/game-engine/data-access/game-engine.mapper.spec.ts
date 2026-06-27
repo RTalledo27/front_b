@@ -1,7 +1,10 @@
 import {
   isGameEngineInvalidPayloadError,
   mapGameEngineCountersResponse,
+  mapGameEngineDrawCommandResponse,
   mapGameEngineDrawsResponse,
+  mapGameEnginePauseResponse,
+  mapGameEngineResumeResponse,
   mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
 } from './game-engine.mapper';
@@ -128,6 +131,133 @@ describe('game-engine.mapper', () => {
     expect(result.outcome).toBe('already_started');
   });
 
+  it('maps the pause command resource envelope', () => {
+    const result = mapGameEnginePauseResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'paused',
+        outcome: 'paused',
+        paused_at: '2026-06-27T12:10:00Z',
+      },
+    });
+
+    expect(result).toEqual({
+      gameId: 'game-1',
+      status: 'paused',
+      outcome: 'paused',
+      pausedAt: '2026-06-27T12:10:00Z',
+    });
+  });
+
+  it('maps the pause replay resource envelope', () => {
+    const result = mapGameEnginePauseResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'paused',
+        outcome: 'already_paused',
+        paused_at: '2026-06-27T12:10:00Z',
+      },
+    });
+
+    expect(result.outcome).toBe('already_paused');
+  });
+
+  it('maps the resume command resource envelope', () => {
+    const result = mapGameEngineResumeResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'running',
+        outcome: 'resumed',
+        resumed_at: '2026-06-27T12:15:00Z',
+        next_draw_at: '2026-06-27T12:15:30Z',
+      },
+    });
+
+    expect(result).toEqual({
+      gameId: 'game-1',
+      status: 'running',
+      outcome: 'resumed',
+      resumedAt: '2026-06-27T12:15:00Z',
+      nextDrawAt: '2026-06-27T12:15:30Z',
+    });
+  });
+
+  it('maps the resume replay resource envelope', () => {
+    const result = mapGameEngineResumeResponse({
+      data: {
+        game_id: 'game-1',
+        status: 'running',
+        outcome: 'already_running',
+        resumed_at: '2026-06-27T12:15:00Z',
+        next_draw_at: '2026-06-27T12:15:30Z',
+      },
+    });
+
+    expect(result.outcome).toBe('already_running');
+  });
+
+  it('maps the draw command resource envelope', () => {
+    const result = mapGameEngineDrawCommandResponse({
+      data: {
+        game_id: 'game-1',
+        draw_id: 'draw-1',
+        game_number_id: 'number-8',
+        sequence: 4,
+        drawn_number: 8,
+        current_hits: 3,
+        hits_required: 5,
+        number_is_sold: false,
+        winner_created: false,
+        winner_entry_id: null,
+        game_status: 'running',
+        drawn_at: '2026-06-27T12:15:00Z',
+        replay: false,
+        ignored_field: 'safe',
+      },
+    });
+
+    expect(result).toEqual({
+      gameId: 'game-1',
+      drawId: 'draw-1',
+      gameNumberId: 'number-8',
+      sequence: 4,
+      drawnNumber: 8,
+      currentHits: 3,
+      hitsRequired: 5,
+      numberIsSold: false,
+      winnerCreated: false,
+      winnerEntryId: null,
+      gameStatus: 'running',
+      drawnAt: '2026-06-27T12:15:00Z',
+      replay: false,
+    });
+  });
+
+  it('maps the draw replay resource with winner data', () => {
+    const result = mapGameEngineDrawCommandResponse({
+      data: {
+        game_id: 'game-1',
+        draw_id: 'draw-2',
+        game_number_id: 'number-1',
+        sequence: 5,
+        drawn_number: 1,
+        current_hits: 2,
+        hits_required: 2,
+        number_is_sold: true,
+        winner_created: true,
+        winner_entry_id: 'entry-1',
+        game_status: 'completed',
+        drawn_at: '2026-06-27T12:16:00Z',
+        replay: true,
+      },
+    });
+
+    expect(result.replay).toBe(true);
+    expect(result.winnerCreated).toBe(true);
+    expect(result.winnerEntryId).toBe('entry-1');
+    expect(result.gameStatus).toBe('completed');
+  });
+
   it('rejects malformed payloads', () => {
     expect(() => mapGameEngineCountersResponse({ data: {}, meta: null })).toThrowError();
     expect(() =>
@@ -151,6 +281,84 @@ describe('game-engine.mapper', () => {
           scheduled_start_at: null,
           started_at: '2026-06-27T12:05:00Z',
           confirmed_entries_count: 12,
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEnginePauseResponse({
+        data: {
+          game_id: 'game-1',
+          status: 'paused',
+          outcome: 'bad_pause',
+          paused_at: '2026-06-27T12:10:00Z',
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineResumeResponse({
+        data: {
+          game_id: 'game-1',
+          status: 'running',
+          outcome: 'already_running',
+          resumed_at: '2026-06-27T12:15:00Z',
+          next_draw_at: 'not-a-date',
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineDrawCommandResponse({
+        data: {
+          game_id: 'game-1',
+          draw_id: 'draw-3',
+          game_number_id: 'number-1',
+          sequence: 0,
+          drawn_number: 1,
+          current_hits: 1,
+          hits_required: 5,
+          number_is_sold: false,
+          winner_created: false,
+          winner_entry_id: null,
+          game_status: 'running',
+          drawn_at: '2026-06-27T12:15:00Z',
+          replay: false,
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineDrawCommandResponse({
+        data: {
+          game_id: 'game-1',
+          draw_id: 'draw-3',
+          game_number_id: 'number-1',
+          sequence: 1,
+          drawn_number: 1,
+          current_hits: 1,
+          hits_required: 5,
+          number_is_sold: false,
+          winner_created: false,
+          winner_entry_id: null,
+          game_status: 'paused',
+          drawn_at: '2026-06-27T12:15:00Z',
+          replay: false,
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineDrawCommandResponse({
+        data: {
+          game_id: 'game-1',
+          draw_id: 'draw-3',
+          game_number_id: 'number-1',
+          sequence: 1,
+          drawn_number: 1,
+          current_hits: 1,
+          hits_required: 5,
+          number_is_sold: false,
+          winner_created: false,
+          winner_entry_id: null,
+          game_status: 'running',
+          drawn_at: 'bad-date',
+          replay: false,
         },
       }),
     ).toThrowError();

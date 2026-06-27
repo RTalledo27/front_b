@@ -22,7 +22,7 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
   imports: [ReactiveFormsModule, RouterLink, StatusBadge],
   providers: [GameEngineFacade],
   host: {
-    '(keydown.escape)': 'closeStartConfirmation()',
+    '(keydown.escape)': 'closeAnyConfirmation()',
   },
   template: `
     <section class="page game-engine-page">
@@ -31,8 +31,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           <p class="eyebrow">Motor administrativo</p>
           <h1>Consola contextual del juego</h1>
           <p>
-            Esta fase habilita una sola mutación auditada del motor usando el UUID real del juego y
-            manteniendo el resto de operaciones fuera de alcance.
+            Esta fase habilita transiciones auditadas del motor usando el UUID real del juego y
+            habilitando draw manual con idempotencia y manteniendo rebuild fuera de alcance.
           </p>
         </div>
       </header>
@@ -119,25 +119,66 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           </app-status-badge>
         </section>
 
-        @if (canStartGame()) {
+        @if (showEngineControls()) {
           <section class="surface-card start-panel" aria-live="polite">
             <div class="start-panel__header">
               <div>
-                <h3>Primera mutación habilitada</h3>
+                <h3>Operaciones del motor habilitadas</h3>
                 <p>
-                  El backend permite iniciar el juego desde ventas cerradas cuando pasa las validaciones
-                  reales de readiness.
+                  El backend permite iniciar, pausar, reanudar o sortear un número solo cuando el
+                  snapshot real y las transiciones auditadas lo soportan.
                 </p>
               </div>
-              <button
-                #openStartButton
-                class="button"
-                type="button"
-                [disabled]="facade.startStatus() === 'submitting'"
-                (click)="openStartConfirmation()"
-              >
-                {{ facade.startStatus() === 'submitting' ? 'Iniciando…' : 'Iniciar juego' }}
-              </button>
+            </div>
+
+            <div class="command-actions">
+              @if (canStartGame()) {
+                <button
+                  #openStartButton
+                  class="button"
+                  type="button"
+                  [disabled]="facade.startStatus() === 'submitting'"
+                  (click)="openStartConfirmation()"
+                >
+                  {{ facade.startStatus() === 'submitting' ? 'Iniciando…' : 'Iniciar juego' }}
+                </button>
+              }
+
+              @if (canPauseGame()) {
+                <button
+                  #openPauseButton
+                  class="button"
+                  type="button"
+                  [disabled]="facade.pauseStatus() === 'submitting'"
+                  (click)="openPauseConfirmation()"
+                >
+                  {{ facade.pauseStatus() === 'submitting' ? 'Pausando…' : 'Pausar juego' }}
+                </button>
+              }
+
+              @if (canResumeGame()) {
+                <button
+                  #openResumeButton
+                  class="button"
+                  type="button"
+                  [disabled]="facade.resumeStatus() === 'submitting'"
+                  (click)="openResumeConfirmation()"
+                >
+                  {{ facade.resumeStatus() === 'submitting' ? 'Reanudando…' : 'Reanudar juego' }}
+                </button>
+              }
+
+              @if (canDrawNumber()) {
+                <button
+                  #openDrawButton
+                  class="button"
+                  type="button"
+                  [disabled]="facade.drawStatus() === 'submitting'"
+                  (click)="openDrawConfirmation()"
+                >
+                  {{ facade.drawStatus() === 'submitting' ? 'Sorteando…' : 'Sortear número' }}
+                </button>
+              }
             </div>
 
             @if (showStartConfirmation()) {
@@ -169,6 +210,94 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
               </div>
             }
 
+            @if (showPauseConfirmation()) {
+              <div class="confirm-box" role="alertdialog" aria-labelledby="pause-confirm-title" aria-modal="false">
+                <h4 id="pause-confirm-title">Confirmar pausa del juego</h4>
+                <p>
+                  Esta acción detiene la automatización del motor, conservará el último tick consumido y
+                  limpiará el próximo draw programado.
+                </p>
+                <div class="confirm-box__actions">
+                  <button
+                    #confirmPauseButton
+                    class="button"
+                    type="button"
+                    [disabled]="facade.pauseStatus() === 'submitting'"
+                    (click)="pauseGame()"
+                  >
+                    Confirmar pausa
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="facade.pauseStatus() === 'submitting'"
+                    (click)="closePauseConfirmation()"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (showResumeConfirmation()) {
+              <div class="confirm-box" role="alertdialog" aria-labelledby="resume-confirm-title" aria-modal="false">
+                <h4 id="resume-confirm-title">Confirmar reanudación del juego</h4>
+                <p>
+                  Esta acción devuelve el juego a ejecución y recalcula el próximo draw automático con la
+                  grilla real del backend.
+                </p>
+                <div class="confirm-box__actions">
+                  <button
+                    #confirmResumeButton
+                    class="button"
+                    type="button"
+                    [disabled]="facade.resumeStatus() === 'submitting'"
+                    (click)="resumeGame()"
+                  >
+                    Confirmar reanudación
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="facade.resumeStatus() === 'submitting'"
+                    (click)="closeResumeConfirmation()"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (showDrawConfirmation()) {
+              <div class="confirm-box" role="alertdialog" aria-labelledby="draw-confirm-title" aria-modal="false">
+                <h4 id="draw-confirm-title">Confirmar sorteo manual</h4>
+                <p>
+                  Esta acción ejecuta una extracción sensible sobre el juego en curso. Se enviará el
+                  UUID real del contexto junto con un command id idempotente para evitar duplicados en
+                  reintentos de red.
+                </p>
+                <div class="confirm-box__actions">
+                  <button
+                    #confirmDrawButton
+                    class="button"
+                    type="button"
+                    [disabled]="facade.drawStatus() === 'submitting'"
+                    (click)="drawNumber()"
+                  >
+                    Confirmar sorteo
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="facade.drawStatus() === 'submitting'"
+                    (click)="closeDrawConfirmation()"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            }
+
             @if (facade.startStatus() === 'success' && facade.startResult(); as startResult) {
               <p class="feedback feedback--success" role="status">
                 {{
@@ -182,12 +311,56 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
                 {{ startErrorMessage() }}
               </p>
             }
+
+            @if (facade.pauseStatus() === 'success' && facade.pauseResult(); as pauseResult) {
+              <p class="feedback feedback--success" role="status">
+                {{
+                  pauseResult.outcome === 'already_paused'
+                    ? 'El backend confirmó que el juego ya estaba pausado.'
+                    : 'El juego se pausó correctamente y el contexto se está refrescando.'
+                }}
+              </p>
+            } @else if (facade.pauseError()) {
+              <p class="feedback feedback--error" role="alert">
+                {{ pauseErrorMessage() }}
+              </p>
+            }
+
+            @if (facade.resumeStatus() === 'success' && facade.resumeResult(); as resumeResult) {
+              <p class="feedback feedback--success" role="status">
+                {{
+                  resumeResult.outcome === 'already_running'
+                    ? 'El backend confirmó que el juego ya estaba en ejecución.'
+                    : 'El juego se reanudó correctamente y el contexto se está refrescando.'
+                }}
+              </p>
+            } @else if (facade.resumeError()) {
+              <p class="feedback feedback--error" role="alert">
+                {{ resumeErrorMessage() }}
+              </p>
+            }
+
+            @if (facade.drawStatus() === 'success' && facade.drawResult(); as drawResult) {
+              <p class="feedback feedback--success" role="status">
+                {{
+                  drawResult.replay
+                    ? 'El backend confirmó el replay del mismo sorteo manual y el contexto se está refrescando.'
+                    : 'Se sorteó el número ' +
+                      drawResult.drawnNumber +
+                      ' y el contexto se está refrescando.'
+                }}
+              </p>
+            } @else if (facade.drawError()) {
+              <p class="feedback feedback--error" role="alert">
+                {{ drawErrorMessage() }}
+              </p>
+            }
           </section>
         }
 
         <p class="read-only-note" aria-live="polite">
-          Solo se habilitó la mutación auditada para iniciar el juego. Pausa, resume, draw y rebuild
-          siguen fuera de este bloque.
+          Rebuild sigue fuera de este bloque. Solo se habilitan las mutaciones del motor que el
+          backend soporta de forma explícita.
         </p>
 
         <div class="summary-grid">
@@ -359,6 +532,11 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       justify-content: space-between;
       align-items: flex-start;
     }
+    .command-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s3);
+    }
     .confirm-box {
       padding: var(--s4);
       border: 1px solid var(--color-border);
@@ -464,7 +642,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       .hero,
       .facts div,
       .counter-number,
-      .start-panel__header {
+      .start-panel__header,
+      .command-actions {
         grid-template-columns: 1fr;
         display: grid;
       }
@@ -481,11 +660,32 @@ export class GameEnginePage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly openStartButton = viewChild<ElementRef<HTMLButtonElement>>('openStartButton');
   private readonly confirmStartButton = viewChild<ElementRef<HTMLButtonElement>>('confirmStartButton');
+  private readonly openPauseButton = viewChild<ElementRef<HTMLButtonElement>>('openPauseButton');
+  private readonly confirmPauseButton = viewChild<ElementRef<HTMLButtonElement>>('confirmPauseButton');
+  private readonly openResumeButton = viewChild<ElementRef<HTMLButtonElement>>('openResumeButton');
+  private readonly confirmResumeButton = viewChild<ElementRef<HTMLButtonElement>>('confirmResumeButton');
+  private readonly openDrawButton = viewChild<ElementRef<HTMLButtonElement>>('openDrawButton');
+  private readonly confirmDrawButton = viewChild<ElementRef<HTMLButtonElement>>('confirmDrawButton');
 
   readonly facade = inject(GameEngineFacade);
   readonly manualGameId = new FormControl('', { nonNullable: true });
   readonly date = formatGameDate;
   readonly winner = computed(() => this.facade.snapshot()?.winner ?? this.fallbackWinner());
+  readonly showEngineControls = computed(
+    () =>
+      this.canStartGame() ||
+      this.canPauseGame() ||
+      this.canResumeGame() ||
+      this.canDrawNumber() ||
+      this.facade.startError() !== null ||
+      this.facade.pauseError() !== null ||
+      this.facade.resumeError() !== null ||
+      this.facade.drawError() !== null ||
+      this.facade.startResult() !== null ||
+      this.facade.pauseResult() !== null ||
+      this.facade.resumeResult() !== null ||
+      this.facade.drawResult() !== null,
+  );
   readonly canStartGame = computed(() => {
     const context = this.facade.snapshot()?.context;
     if (context === undefined) {
@@ -502,13 +702,75 @@ export class GameEnginePage {
 
     return Date.parse(context.schedule.scheduledStartAt) <= Date.now();
   });
+  readonly canPauseGame = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    return (
+      context.status.value === 'running' &&
+      context.schedule.autoDrawEnabled &&
+      context.lifecycle.startedAt !== null &&
+      context.lifecycle.pausedAt === null &&
+      context.lifecycle.completedAt === null
+    );
+  });
+  readonly canResumeGame = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    return (
+      context.status.value === 'paused' &&
+      context.schedule.autoDrawEnabled &&
+      context.lifecycle.startedAt !== null &&
+      context.lifecycle.pausedAt !== null &&
+      context.lifecycle.completedAt === null &&
+      context.engine.nextDrawAt === null
+    );
+  });
+  readonly canDrawNumber = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    return (
+      context.status.value === 'running' &&
+      context.schedule.autoDrawEnabled === false &&
+      context.lifecycle.startedAt !== null &&
+      context.lifecycle.pausedAt === null &&
+      context.lifecycle.completedAt === null &&
+      this.winner() === null
+    );
+  });
   readonly showStartConfirmation = signal(false);
+  readonly showPauseConfirmation = signal(false);
+  readonly showResumeConfirmation = signal(false);
+  readonly showDrawConfirmation = signal(false);
   backQueryParams: Params = {};
 
   constructor() {
     effect(() => {
       if (this.showStartConfirmation()) {
         this.confirmStartButton()?.nativeElement.focus();
+      }
+    });
+    effect(() => {
+      if (this.showPauseConfirmation()) {
+        this.confirmPauseButton()?.nativeElement.focus();
+      }
+    });
+    effect(() => {
+      if (this.showResumeConfirmation()) {
+        this.confirmResumeButton()?.nativeElement.focus();
+      }
+    });
+    effect(() => {
+      if (this.showDrawConfirmation()) {
+        this.confirmDrawButton()?.nativeElement.focus();
       }
     });
 
@@ -548,6 +810,9 @@ export class GameEnginePage {
       return;
     }
 
+    this.showPauseConfirmation.set(false);
+    this.showResumeConfirmation.set(false);
+    this.showDrawConfirmation.set(false);
     this.showStartConfirmation.set(true);
   }
 
@@ -560,9 +825,91 @@ export class GameEnginePage {
     this.openStartButton()?.nativeElement.focus();
   }
 
+  openPauseConfirmation(): void {
+    if (!this.canPauseGame() || this.facade.pauseStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(false);
+    this.showResumeConfirmation.set(false);
+    this.showDrawConfirmation.set(false);
+    this.showPauseConfirmation.set(true);
+  }
+
+  closePauseConfirmation(): void {
+    if (!this.showPauseConfirmation() || this.facade.pauseStatus() === 'submitting') {
+      return;
+    }
+
+    this.showPauseConfirmation.set(false);
+    this.openPauseButton()?.nativeElement.focus();
+  }
+
+  openResumeConfirmation(): void {
+    if (!this.canResumeGame() || this.facade.resumeStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(false);
+    this.showPauseConfirmation.set(false);
+    this.showDrawConfirmation.set(false);
+    this.showResumeConfirmation.set(true);
+  }
+
+  closeResumeConfirmation(): void {
+    if (!this.showResumeConfirmation() || this.facade.resumeStatus() === 'submitting') {
+      return;
+    }
+
+    this.showResumeConfirmation.set(false);
+    this.openResumeButton()?.nativeElement.focus();
+  }
+
+  closeAnyConfirmation(): void {
+    this.closeStartConfirmation();
+    this.closePauseConfirmation();
+    this.closeResumeConfirmation();
+    this.closeDrawConfirmation();
+  }
+
   startGame(): void {
     this.showStartConfirmation.set(false);
     this.facade.startGame();
+  }
+
+  pauseGame(): void {
+    this.showPauseConfirmation.set(false);
+    this.facade.pauseGame();
+  }
+
+  resumeGame(): void {
+    this.showResumeConfirmation.set(false);
+    this.facade.resumeGame();
+  }
+
+  openDrawConfirmation(): void {
+    if (!this.canDrawNumber() || this.facade.drawStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(false);
+    this.showPauseConfirmation.set(false);
+    this.showResumeConfirmation.set(false);
+    this.showDrawConfirmation.set(true);
+  }
+
+  closeDrawConfirmation(): void {
+    if (!this.showDrawConfirmation() || this.facade.drawStatus() === 'submitting') {
+      return;
+    }
+
+    this.showDrawConfirmation.set(false);
+    this.openDrawButton()?.nativeElement.focus();
+  }
+
+  drawNumber(): void {
+    this.showDrawConfirmation.set(false);
+    this.facade.drawNumber();
   }
 
   startErrorMessage(): string {
@@ -578,6 +925,61 @@ export class GameEnginePage {
     return error.message;
   }
 
+  pauseErrorMessage(): string {
+    const error = this.facade.pauseError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.pauseStatus() === 'invalidState') {
+      return 'Laravel rechazó la pausa porque el juego no está en una transición pausable o la automatización no aplica.';
+    }
+
+    if (this.facade.pauseStatus() === 'conflict') {
+      return 'Laravel detectó una inconsistencia de integridad al pausar el juego. Refresca el contexto antes de volver a intentarlo.';
+    }
+
+    return error.message;
+  }
+
+  resumeErrorMessage(): string {
+    const error = this.facade.resumeError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.resumeStatus() === 'invalidState') {
+      return 'Laravel rechazó la reanudación porque el juego no está en una transición reanudable o la automatización no aplica.';
+    }
+
+    if (this.facade.resumeStatus() === 'conflict') {
+      return 'Laravel detectó una inconsistencia de integridad al reanudar el juego. Refresca el contexto antes de volver a intentarlo.';
+    }
+
+    return error.message;
+  }
+
+  drawErrorMessage(): string {
+    const error = this.facade.drawError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.drawStatus() === 'invalidState') {
+      return 'Laravel rechazó el sorteo manual porque el juego ya no admite draw en este estado operativo.';
+    }
+
+    if (this.facade.drawStatus() === 'conflict') {
+      return 'Laravel detectó un conflicto de integridad o concurrencia al sortear. Refresca el contexto antes de volver a intentarlo.';
+    }
+
+    if (this.facade.drawStatus() === 'networkError') {
+      return 'No pudimos confirmar el sorteo por un problema de red. Puedes reintentar con seguridad.';
+    }
+
+    return error.message;
+  }
+
   private loadFromRoute(routeGameId: string, queryGameId: string): void {
     const resolvedGameId = routeGameId || queryGameId;
 
@@ -587,6 +989,9 @@ export class GameEnginePage {
     }
 
     this.showStartConfirmation.set(false);
+    this.showPauseConfirmation.set(false);
+    this.showResumeConfirmation.set(false);
+    this.showDrawConfirmation.set(false);
     this.facade.load(resolvedGameId, routeGameId !== '' ? 'contextual' : 'manual');
   }
 

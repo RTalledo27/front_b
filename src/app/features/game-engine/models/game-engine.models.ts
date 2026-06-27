@@ -40,6 +40,37 @@ export interface GameEngineStartCommandView {
   confirmedEntriesCount: number;
 }
 
+export interface GameEnginePauseCommandView {
+  gameId: string;
+  status: 'paused';
+  outcome: 'paused' | 'already_paused';
+  pausedAt: string;
+}
+
+export interface GameEngineResumeCommandView {
+  gameId: string;
+  status: 'running';
+  outcome: 'resumed' | 'already_running';
+  resumedAt: string;
+  nextDrawAt: string;
+}
+
+export interface GameEngineDrawCommandView {
+  gameId: string;
+  drawId: string;
+  gameNumberId: string;
+  sequence: number;
+  drawnNumber: number;
+  currentHits: number;
+  hitsRequired: number;
+  numberIsSold: boolean;
+  winnerCreated: boolean;
+  winnerEntryId: string | null;
+  gameStatus: 'running' | 'completed';
+  drawnAt: string;
+  replay: boolean;
+}
+
 export interface GameEngineConsoleView {
   context: AdminGameDetailView;
   draws: GameEngineDrawView[];
@@ -49,16 +80,22 @@ export interface GameEngineConsoleView {
 
 export type GameEngineAccessMode = 'contextual' | 'manual';
 
-export type GameEngineStartStatus =
+export type GameEngineCommandStatus =
   | 'idle'
   | 'submitting'
   | 'success'
+  | 'conflict'
   | 'unauthorized'
   | 'forbidden'
   | 'notFound'
   | 'invalidState'
   | 'networkError'
   | 'unexpectedError';
+
+export type GameEngineStartStatus = GameEngineCommandStatus;
+export type GameEnginePauseStatus = GameEngineCommandStatus;
+export type GameEngineResumeStatus = GameEngineCommandStatus;
+export type GameEngineDrawStatus = GameEngineCommandStatus;
 
 export type GameEnginePageStatus =
   | 'idle'

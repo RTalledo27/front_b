@@ -6,7 +6,10 @@ import {
 import { buildAdminGameNumberStatus } from '../../admin-games/utils/admin-games-display';
 import {
   GameEngineCounterView,
+  GameEngineDrawCommandView,
   GameEngineDrawView,
+  GameEnginePauseCommandView,
+  GameEngineResumeCommandView,
   GameEngineStartCommandView,
   GameEngineWinnerView,
 } from '../models/game-engine.models';
@@ -43,6 +46,30 @@ export function mapGameEngineStartResponse(response: unknown): GameEngineStartCo
   }
 
   return mapGameEngineStart(response.data);
+}
+
+export function mapGameEnginePauseResponse(response: unknown): GameEnginePauseCommandView {
+  if (!isDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return mapGameEnginePause(response.data);
+}
+
+export function mapGameEngineResumeResponse(response: unknown): GameEngineResumeCommandView {
+  if (!isDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return mapGameEngineResume(response.data);
+}
+
+export function mapGameEngineDrawCommandResponse(response: unknown): GameEngineDrawCommandView {
+  if (!isDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return mapGameEngineDrawCommand(response.data);
 }
 
 export function isGameEngineInvalidPayloadError(error: unknown): boolean {
@@ -111,6 +138,72 @@ function mapGameEngineStart(payload: unknown): GameEngineStartCommandView {
   };
 }
 
+function mapGameEnginePause(payload: unknown): GameEnginePauseCommandView {
+  const record = readRecord(payload);
+  const outcome = readString(record['outcome']);
+
+  if (outcome !== 'paused' && outcome !== 'already_paused') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  if (readString(record['status']) !== 'paused') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return {
+    gameId: readString(record['game_id']),
+    status: 'paused',
+    outcome,
+    pausedAt: readIsoDate(record['paused_at']),
+  };
+}
+
+function mapGameEngineResume(payload: unknown): GameEngineResumeCommandView {
+  const record = readRecord(payload);
+  const outcome = readString(record['outcome']);
+
+  if (outcome !== 'resumed' && outcome !== 'already_running') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  if (readString(record['status']) !== 'running') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return {
+    gameId: readString(record['game_id']),
+    status: 'running',
+    outcome,
+    resumedAt: readIsoDate(record['resumed_at']),
+    nextDrawAt: readIsoDate(record['next_draw_at']),
+  };
+}
+
+function mapGameEngineDrawCommand(payload: unknown): GameEngineDrawCommandView {
+  const record = readRecord(payload);
+  const gameStatus = readString(record['game_status']);
+
+  if (gameStatus !== 'running' && gameStatus !== 'completed') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return {
+    gameId: readString(record['game_id']),
+    drawId: readString(record['draw_id']),
+    gameNumberId: readString(record['game_number_id']),
+    sequence: readPositiveNumber(record['sequence']),
+    drawnNumber: readPositiveNumber(record['drawn_number']),
+    currentHits: readPositiveNumber(record['current_hits']),
+    hitsRequired: readPositiveNumber(record['hits_required']),
+    numberIsSold: readBoolean(record['number_is_sold']),
+    winnerCreated: readBoolean(record['winner_created']),
+    winnerEntryId: readNullableString(record['winner_entry_id']),
+    gameStatus,
+    drawnAt: readIsoDate(record['drawn_at']),
+    replay: readBoolean(record['replay']),
+  };
+}
+
 function isDataResponse(value: unknown): value is LaravelDataResponse<unknown> {
   return isRecord(value) && 'data' in value;
 }
@@ -147,12 +240,38 @@ function readNumber(value: unknown): number {
   return value;
 }
 
+function readPositiveNumber(value: unknown): number {
+  const number = readNumber(value);
+
+  if (number < 1) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return number;
+}
+
 function readNullableNumber(value: unknown): number | null {
   if (value === null) {
     return null;
   }
 
   return readNumber(value);
+}
+
+function readBoolean(value: unknown): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return value;
+}
+
+function readNullableString(value: unknown): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  return readString(value);
 }
 
 function readIsoDate(value: unknown): string {

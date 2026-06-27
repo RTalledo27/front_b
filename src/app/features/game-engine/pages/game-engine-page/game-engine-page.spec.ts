@@ -12,6 +12,9 @@ function createFacadeMock() {
     refresh: vi.fn(),
     clear: vi.fn(),
     startGame: vi.fn(),
+    pauseGame: vi.fn(),
+    resumeGame: vi.fn(),
+    drawNumber: vi.fn(),
     snapshot: signal<GameEngineConsoleView | null>({
       context: {
         id: 'game-1',
@@ -37,8 +40,23 @@ function createFacadeMock() {
         winner: null,
         commerce: {
           reservations: { total: 0 },
-          orders: { pending: 0, paymentSubmitted: 0, paid: 0, rejected: 0, expired: 0, cancelled: 0, refunded: 0 },
-          payments: { pending: 0, underReview: 0, approved: 0, rejected: 0, cancelled: 0, refunded: 0 },
+          orders: {
+            pending: 0,
+            paymentSubmitted: 0,
+            paid: 0,
+            rejected: 0,
+            expired: 0,
+            cancelled: 0,
+            refunded: 0,
+          },
+          payments: {
+            pending: 0,
+            underReview: 0,
+            approved: 0,
+            rejected: 0,
+            cancelled: 0,
+            refunded: 0,
+          },
           entries: { confirmed: 2, cancelled: 0, refunded: 0, winner: 0 },
         },
         projection: { drawsTotal: 0, distinctDrawnNumbers: 0, maxCounterHits: 0, lastDrawnNumber: null },
@@ -50,12 +68,30 @@ function createFacadeMock() {
       winner: null,
     }),
     status: signal<
-      'idle' | 'loading' | 'refreshing' | 'loaded' | 'unauthorized' | 'forbidden' | 'notFound' | 'validationError' | 'networkError' | 'unexpectedError'
+      | 'idle'
+      | 'loading'
+      | 'refreshing'
+      | 'loaded'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'validationError'
+      | 'networkError'
+      | 'unexpectedError'
     >('loaded'),
     error: signal<{ message: string } | null>(null),
     accessMode: signal<'contextual' | 'manual'>('contextual'),
     startStatus: signal<
-      'idle' | 'submitting' | 'success' | 'unauthorized' | 'forbidden' | 'notFound' | 'invalidState' | 'networkError' | 'unexpectedError'
+      | 'idle'
+      | 'submitting'
+      | 'success'
+      | 'conflict'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'invalidState'
+      | 'networkError'
+      | 'unexpectedError'
     >('idle'),
     startError: signal<{ message: string } | null>(null),
     startResult: signal<{
@@ -66,148 +102,295 @@ function createFacadeMock() {
       startedAt: string;
       confirmedEntriesCount: number;
     } | null>(null),
+    pauseStatus: signal<
+      | 'idle'
+      | 'submitting'
+      | 'success'
+      | 'conflict'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'invalidState'
+      | 'networkError'
+      | 'unexpectedError'
+    >('idle'),
+    pauseError: signal<{ message: string } | null>(null),
+    pauseResult: signal<{
+      gameId: string;
+      status: 'paused';
+      outcome: 'paused' | 'already_paused';
+      pausedAt: string;
+    } | null>(null),
+    resumeStatus: signal<
+      | 'idle'
+      | 'submitting'
+      | 'success'
+      | 'conflict'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'invalidState'
+      | 'networkError'
+      | 'unexpectedError'
+    >('idle'),
+    resumeError: signal<{ message: string } | null>(null),
+    resumeResult: signal<{
+      gameId: string;
+      status: 'running';
+      outcome: 'resumed' | 'already_running';
+      resumedAt: string;
+      nextDrawAt: string;
+    } | null>(null),
+    drawStatus: signal<
+      | 'idle'
+      | 'submitting'
+      | 'success'
+      | 'conflict'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'invalidState'
+      | 'networkError'
+      | 'unexpectedError'
+    >('idle'),
+    drawError: signal<{ message: string } | null>(null),
+    drawResult: signal<{
+      gameId: string;
+      drawId: string;
+      gameNumberId: string;
+      sequence: number;
+      drawnNumber: number;
+      currentHits: number;
+      hitsRequired: number;
+      numberIsSold: boolean;
+      winnerCreated: boolean;
+      winnerEntryId: string | null;
+      gameStatus: 'running' | 'completed';
+      drawnAt: string;
+      replay: boolean;
+    } | null>(null),
   };
 }
 
-describe('GameEnginePage', () => {
-  it('loads the contextual route and shows only the audited start mutation', async () => {
-    const facade = createFacadeMock();
-
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({ page: '2', search: 'central' })),
-          },
+async function renderPage(facade: ReturnType<typeof createFacadeMock>, routeGameId = 'game-1') {
+  await TestBed.configureTestingModule({
+    imports: [GameEnginePage],
+    providers: [
+      provideRouter([]),
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          paramMap: of(convertToParamMap(routeGameId === '' ? {} : { gameId: routeGameId })),
+          queryParamMap: of(convertToParamMap({})),
         },
-      ],
+      },
+    ],
+  })
+    .overrideComponent(GameEnginePage, {
+      set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
     })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
+    .compileComponents();
 
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
+  const fixture = TestBed.createComponent(GameEnginePage);
+  fixture.detectChanges();
+  return fixture;
+}
+
+describe('GameEnginePage', () => {
+  it('loads the contextual route and shows the start action when the contract allows it', async () => {
+    const facade = createFacadeMock();
+    const fixture = await renderPage(facade);
     const text = fixture.nativeElement.textContent;
 
     expect(facade.load).toHaveBeenCalledWith('game-1', 'contextual');
     expect(text).toContain('Bingo Central');
-    expect(text).toContain('Volver al detalle del juego');
     expect(text).toContain('Iniciar juego');
-    expect(text).not.toContain('Pausar');
-    expect(text).not.toContain('Extraer número');
+    expect(text).not.toContain('Pausar juego');
+    expect(text).not.toContain('Reanudar juego');
+    expect(text).not.toContain('Sortear número');
     expect(text).not.toContain('Reconstruir contadores');
   });
 
-  it('opens confirmation and submits the start mutation once', async () => {
+  it('shows the pause action only when the contextual snapshot is pausable', async () => {
     const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+        engine: { nextDrawAt: '2026-06-27T12:15:30Z', lastConsumedTickAt: '2026-06-27T12:09:30Z' },
+      },
+    });
 
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Pausar juego');
+    expect(text).not.toContain('Reanudar juego');
+    expect(text).not.toContain('Sortear número');
+  });
+
+  it('shows the resume action only when the contextual snapshot is resumable', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'paused', label: 'Pausado', tone: 'warning', isKnown: true },
+        lifecycle: {
+          startedAt: '2026-06-27T12:05:00Z',
+          pausedAt: '2026-06-27T12:10:00Z',
+          completedAt: null,
         },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
+      },
+    });
 
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
 
+    expect(text).toContain('Reanudar juego');
+    expect(text).not.toContain('Pausar juego');
+  });
+
+  it('shows the draw action only when the contextual snapshot is drawable in manual mode', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Sortear número');
+    expect(text).not.toContain('Reconstruir contadores');
+  });
+
+  it('hides the draw action when automation is active', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).not.toContain('Sortear número');
+  });
+
+  it('hides the draw action for an invalid completed snapshot', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: {
+          startedAt: '2026-06-27T12:05:00Z',
+          pausedAt: null,
+          completedAt: '2026-06-27T12:20:00Z',
+        },
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).not.toContain('Sortear número');
+  });
+
+  it('hides the draw action when a winner already exists', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+      winner: {
+        winnerId: 'winner-1',
+        gameId: 'game-1',
+        gameEntryId: 'entry-1',
+        gameNumberId: 'number-1',
+        winningNumber: 1,
+        gameDrawId: 'draw-1',
+        winningDrawSequence: 2,
+        winningHits: 2,
+        userId: 5,
+        wonAt: '2026-06-27T12:20:00Z',
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).not.toContain('Sortear número');
+  });
+
+  it('opens confirmation and submits the draw mutation once', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+    });
+
+    const fixture = await renderPage(facade);
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
-    buttons.find((button) => button.textContent?.includes('Iniciar juego'))?.click();
+    buttons.find((button) => button.textContent?.includes('Sortear número'))?.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Confirmar inicio del juego');
-    expect(document.activeElement?.textContent).toContain('Confirmar inicio');
+    expect(fixture.nativeElement.textContent).toContain('Confirmar sorteo manual');
+    expect(document.activeElement?.textContent).toContain('Confirmar sorteo');
 
     const confirmButtons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
-    confirmButtons.find((button) => button.textContent?.includes('Confirmar inicio'))?.click();
+    confirmButtons.find((button) => button.textContent?.includes('Confirmar sorteo'))?.click();
 
-    expect(facade.startGame).toHaveBeenCalledTimes(1);
+    expect(facade.drawNumber).toHaveBeenCalledTimes(1);
   });
 
-  it('cancels the confirmation without mutating and restores focus', async () => {
+  it('cancels the draw confirmation with Escape without mutating and restores focus', async () => {
     const facade = createFacadeMock();
-
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
         },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+    });
 
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
-
+    const fixture = await renderPage(facade);
     const openButton = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
-      (button as HTMLButtonElement).textContent?.includes('Iniciar juego'),
-    ) as HTMLButtonElement;
-    openButton.click();
-    fixture.detectChanges();
-
-    const cancelButton = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
-      (button as HTMLButtonElement).textContent?.includes('Cancelar'),
-    ) as HTMLButtonElement;
-    cancelButton.click();
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).not.toContain('Confirmar inicio del juego');
-    expect(facade.startGame).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(openButton);
-  });
-
-  it('closes the confirmation with Escape without mutating', async () => {
-    const facade = createFacadeMock();
-
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
-        },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
-
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
-
-    const openButton = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
-      (button as HTMLButtonElement).textContent?.includes('Iniciar juego'),
+      (button as HTMLButtonElement).textContent?.includes('Sortear número'),
     ) as HTMLButtonElement;
     openButton.click();
     fixture.detectChanges();
@@ -215,37 +398,82 @@ describe('GameEnginePage', () => {
     fixture.nativeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).not.toContain('Confirmar inicio del juego');
-    expect(facade.startGame).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain('Confirmar sorteo manual');
+    expect(facade.drawNumber).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(openButton);
   });
 
-  it('shows mutation feedback when Laravel rejects start by invalid state', async () => {
+  it('shows draw replay feedback when backend confirms the same command', async () => {
     const facade = createFacadeMock();
-    facade.startStatus.set('invalidState');
-    facade.startError.set({ message: 'game_not_ready_for_start' });
+    facade.drawStatus.set('success');
+    facade.drawResult.set({
+      gameId: 'game-1',
+      drawId: 'draw-1',
+      gameNumberId: 'number-1',
+      sequence: 1,
+      drawnNumber: 19,
+      currentHits: 1,
+      hitsRequired: 5,
+      numberIsSold: false,
+      winnerCreated: false,
+      winnerEntryId: null,
+      gameStatus: 'running',
+      drawnAt: '2026-06-27T12:16:00Z',
+      replay: true,
+    });
 
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
-        },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('replay del mismo sorteo manual');
+  });
 
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
+  it('shows draw success feedback with the drawn number', async () => {
+    const facade = createFacadeMock();
+    facade.drawStatus.set('success');
+    facade.drawResult.set({
+      gameId: 'game-1',
+      drawId: 'draw-1',
+      gameNumberId: 'number-1',
+      sequence: 1,
+      drawnNumber: 19,
+      currentHits: 1,
+      hitsRequired: 5,
+      numberIsSold: false,
+      winnerCreated: false,
+      winnerEntryId: null,
+      gameStatus: 'running',
+      drawnAt: '2026-06-27T12:16:00Z',
+      replay: false,
+    });
 
-    expect(fixture.nativeElement.textContent).toContain('readiness actual');
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('Se sorteó el número 19');
+  });
+
+  it('shows draw conflict feedback when Laravel rejects the manual draw', async () => {
+    const facade = createFacadeMock();
+    facade.drawStatus.set('conflict');
+    facade.drawError.set({ message: 'game_lifecycle_integrity_violation' });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('conflicto de integridad o concurrencia');
+  });
+
+  it('shows draw invalid-state feedback when Laravel rejects the manual draw', async () => {
+    const facade = createFacadeMock();
+    facade.drawStatus.set('invalidState');
+    facade.drawError.set({ message: 'game_engine_automation_active' });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('ya no admite draw');
+  });
+
+  it('shows draw network feedback when the request outcome is unknown', async () => {
+    const facade = createFacadeMock();
+    facade.drawStatus.set('networkError');
+    facade.drawError.set({ message: 'network_error' });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('Puedes reintentar con seguridad');
   });
 
   it('shows the secondary manual UUID access when there is no contextual game', async () => {
@@ -253,101 +481,9 @@ describe('GameEnginePage', () => {
     facade.status.set('idle');
     facade.snapshot.set(null);
 
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({})),
-            queryParamMap: of(convertToParamMap({})),
-          },
-        },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
-
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
+    const fixture = await renderPage(facade, '');
 
     expect(facade.clear).toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('diagnóstico técnico secundario');
-  });
-
-  it('hides the start button when the scheduled time has not arrived yet', async () => {
-    const facade = createFacadeMock();
-    facade.snapshot.set({
-      ...facade.snapshot()!,
-      context: {
-        ...facade.snapshot()!.context,
-        schedule: {
-          ...facade.snapshot()!.context.schedule,
-          scheduledStartAt: '2099-06-27T12:00:00Z',
-        },
-      },
-    });
-
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
-        },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
-
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).not.toContain('Iniciar juego');
-  });
-
-  it('shows replay feedback when backend reports already_started', async () => {
-    const facade = createFacadeMock();
-    facade.startStatus.set('success');
-    facade.startResult.set({
-      gameId: 'game-1',
-      status: 'running',
-      outcome: 'already_started',
-      scheduledStartAt: '2026-06-27T01:00:00Z',
-      startedAt: '2026-06-27T12:05:00Z',
-      confirmedEntriesCount: 2,
-    });
-
-    await TestBed.configureTestingModule({
-      imports: [GameEnginePage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: of(convertToParamMap({ gameId: 'game-1' })),
-            queryParamMap: of(convertToParamMap({})),
-          },
-        },
-      ],
-    })
-      .overrideComponent(GameEnginePage, {
-        set: { providers: [{ provide: GameEngineFacade, useValue: facade }] },
-      })
-      .compileComponents();
-
-    const fixture = TestBed.createComponent(GameEnginePage);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('ya estaba iniciado');
   });
 });

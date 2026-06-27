@@ -9,11 +9,18 @@ import { ADMIN_GAMES_REPOSITORY } from '../../admin-games/data-access/admin-game
 import {
   GameEngineAccessMode,
   GameEngineConsoleView,
+  GameEngineDrawCommandView,
+  GameEngineDrawStatus,
+  GameEnginePauseCommandView,
+  GameEnginePauseStatus,
   GameEnginePageStatus,
+  GameEngineResumeCommandView,
+  GameEngineResumeStatus,
   GameEngineStartCommandView,
   GameEngineStartStatus,
   GameEngineWinnerView,
 } from '../models/game-engine.models';
+import { DrawCommandIdService } from './draw-command-id.service';
 import { GAME_ENGINE_REPOSITORY } from './game-engine.repository';
 
 @Injectable()
@@ -21,11 +28,15 @@ export class GameEngineFacade {
   private readonly adminGamesRepository = inject(ADMIN_GAMES_REPOSITORY);
   private readonly repository = inject(GAME_ENGINE_REPOSITORY);
   private readonly session = inject(AuthSessionService);
+  private readonly drawCommandIds = inject(DrawCommandIdService);
   private readonly destroyRef = inject(DestroyRef);
 
   private loadSequence = 0;
   private activeGameId = '';
   private startSequence = 0;
+  private pauseSequence = 0;
+  private resumeSequence = 0;
+  private drawSequence = 0;
 
   readonly snapshot = signal<GameEngineConsoleView | null>(null);
   readonly status = signal<GameEnginePageStatus>('idle');
@@ -34,6 +45,15 @@ export class GameEngineFacade {
   readonly startStatus = signal<GameEngineStartStatus>('idle');
   readonly startError = signal<ApiError | null>(null);
   readonly startResult = signal<GameEngineStartCommandView | null>(null);
+  readonly pauseStatus = signal<GameEnginePauseStatus>('idle');
+  readonly pauseError = signal<ApiError | null>(null);
+  readonly pauseResult = signal<GameEnginePauseCommandView | null>(null);
+  readonly resumeStatus = signal<GameEngineResumeStatus>('idle');
+  readonly resumeError = signal<ApiError | null>(null);
+  readonly resumeResult = signal<GameEngineResumeCommandView | null>(null);
+  readonly drawStatus = signal<GameEngineDrawStatus>('idle');
+  readonly drawError = signal<ApiError | null>(null);
+  readonly drawResult = signal<GameEngineDrawCommandView | null>(null);
 
   load(gameId: string, accessMode: GameEngineAccessMode): void {
     const normalizedGameId = gameId.trim();
@@ -42,7 +62,12 @@ export class GameEngineFacade {
       return;
     }
 
+    const isGameChanged = normalizedGameId !== this.activeGameId;
     const hasLoadedSnapshot = this.snapshot()?.context.id === normalizedGameId;
+
+    if (isGameChanged) {
+      this.resetCommandState();
+    }
 
     this.activeGameId = normalizedGameId;
     this.loadSequence += 1;
@@ -97,17 +122,34 @@ export class GameEngineFacade {
     this.activeGameId = '';
     this.loadSequence += 1;
     this.startSequence += 1;
+    this.pauseSequence += 1;
+    this.resumeSequence += 1;
+    this.drawSequence += 1;
     this.snapshot.set(null);
     this.error.set(null);
     this.status.set('idle');
     this.accessMode.set('contextual');
+    this.resetCommandState();
+  }
+
+  private resetCommandState(): void {
+    this.drawCommandIds.clear();
     this.startStatus.set('idle');
     this.startError.set(null);
     this.startResult.set(null);
+    this.pauseStatus.set('idle');
+    this.pauseError.set(null);
+    this.pauseResult.set(null);
+    this.resumeStatus.set('idle');
+    this.resumeError.set(null);
+    this.resumeResult.set(null);
+    this.drawStatus.set('idle');
+    this.drawError.set(null);
+    this.drawResult.set(null);
   }
 
   startGame(): void {
-    if (this.startStatus() === 'submitting' || this.activeGameId === '') {
+    if (!this.canSubmitCommand(this.startStatus())) {
       return;
     }
 
@@ -147,6 +189,139 @@ export class GameEngineFacade {
       });
   }
 
+  pauseGame(): void {
+    if (!this.canSubmitCommand(this.pauseStatus())) {
+      return;
+    }
+
+    const sequence = this.pauseSequence + 1;
+    this.pauseSequence = sequence;
+    const gameId = this.activeGameId;
+    const requestUserId = this.session.user()?.id ?? null;
+
+    this.pauseStatus.set('submitting');
+    this.pauseError.set(null);
+    this.pauseResult.set(null);
+
+    this.repository
+      .pauseGame(gameId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          if (!this.isCurrentPauseRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          this.pauseResult.set(result);
+          this.pauseError.set(null);
+          this.pauseStatus.set('success');
+          this.refresh();
+        },
+        error: (error: unknown) => {
+          if (!this.isCurrentPauseRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          const apiError = toApiError(error);
+          this.pauseResult.set(null);
+          this.pauseError.set(apiError);
+          this.pauseStatus.set(resolveCommandStatus(apiError));
+        },
+      });
+  }
+
+  resumeGame(): void {
+    if (!this.canSubmitCommand(this.resumeStatus())) {
+      return;
+    }
+
+    const sequence = this.resumeSequence + 1;
+    this.resumeSequence = sequence;
+    const gameId = this.activeGameId;
+    const requestUserId = this.session.user()?.id ?? null;
+
+    this.resumeStatus.set('submitting');
+    this.resumeError.set(null);
+    this.resumeResult.set(null);
+
+    this.repository
+      .resumeGame(gameId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          if (!this.isCurrentResumeRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          this.resumeResult.set(result);
+          this.resumeError.set(null);
+          this.resumeStatus.set('success');
+          this.refresh();
+        },
+        error: (error: unknown) => {
+          if (!this.isCurrentResumeRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          const apiError = toApiError(error);
+          this.resumeResult.set(null);
+          this.resumeError.set(apiError);
+          this.resumeStatus.set(resolveCommandStatus(apiError));
+        },
+      });
+  }
+
+  drawNumber(): void {
+    if (!this.canSubmitCommand(this.drawStatus())) {
+      return;
+    }
+
+    const userId = this.session.user()?.id ?? null;
+    if (userId === null || this.activeGameId === '') {
+      return;
+    }
+
+    const sequence = this.drawSequence + 1;
+    this.drawSequence = sequence;
+    const gameId = this.activeGameId;
+    const commandId = this.drawCommandIds.getOrCreate({ userId, gameId });
+
+    this.drawStatus.set('submitting');
+    this.drawError.set(null);
+    this.drawResult.set(null);
+
+    this.repository
+      .drawNumber(gameId, commandId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          if (!this.isCurrentDrawRequest(sequence, gameId, userId)) {
+            return;
+          }
+
+          this.drawCommandIds.clear();
+          this.drawResult.set(result);
+          this.drawError.set(null);
+          this.drawStatus.set('success');
+          this.refresh();
+        },
+        error: (error: unknown) => {
+          if (!this.isCurrentDrawRequest(sequence, gameId, userId)) {
+            return;
+          }
+
+          const apiError = toApiError(error);
+          this.drawResult.set(null);
+          this.drawError.set(apiError);
+          this.drawStatus.set(resolveCommandStatus(apiError));
+
+          if (shouldClearDrawCommandId(apiError)) {
+            this.drawCommandIds.clear();
+          }
+        },
+      });
+  }
+
   private loadWinnerOrNull(gameId: string) {
     return this.repository.getWinner(gameId).pipe(
       catchError((error: unknown) => {
@@ -175,6 +350,34 @@ export class GameEngineFacade {
       (this.session.user()?.id ?? null) === requestUserId
     );
   }
+
+  private isCurrentPauseRequest(sequence: number, gameId: string, requestUserId: number | null): boolean {
+    return (
+      sequence === this.pauseSequence &&
+      gameId === this.activeGameId &&
+      (this.session.user()?.id ?? null) === requestUserId
+    );
+  }
+
+  private isCurrentResumeRequest(sequence: number, gameId: string, requestUserId: number | null): boolean {
+    return (
+      sequence === this.resumeSequence &&
+      gameId === this.activeGameId &&
+      (this.session.user()?.id ?? null) === requestUserId
+    );
+  }
+
+  private isCurrentDrawRequest(sequence: number, gameId: string, requestUserId: number | null): boolean {
+    return (
+      sequence === this.drawSequence &&
+      gameId === this.activeGameId &&
+      (this.session.user()?.id ?? null) === requestUserId
+    );
+  }
+
+  private canSubmitCommand(status: 'idle' | 'submitting' | 'success' | 'conflict' | 'unauthorized' | 'forbidden' | 'notFound' | 'invalidState' | 'networkError' | 'unexpectedError'): boolean {
+    return this.activeGameId !== '' && status !== 'submitting';
+  }
 }
 
 function resolveGameEngineStatus(error: ApiError): GameEnginePageStatus {
@@ -195,7 +398,13 @@ function resolveGameEngineStatus(error: ApiError): GameEnginePageStatus {
 }
 
 function resolveStartStatus(error: ApiError): GameEngineStartStatus {
+  return resolveCommandStatus(error);
+}
+
+function resolveCommandStatus(error: ApiError): GameEngineStartStatus {
   switch (error.status) {
+    case 409:
+      return 'conflict';
     case 401:
       return 'unauthorized';
     case 403:
@@ -209,4 +418,8 @@ function resolveStartStatus(error: ApiError): GameEngineStartStatus {
     default:
       return 'unexpectedError';
   }
+}
+
+function shouldClearDrawCommandId(error: ApiError): boolean {
+  return error.status > 0 && error.status < 500;
 }

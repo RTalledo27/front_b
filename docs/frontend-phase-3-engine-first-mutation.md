@@ -179,4 +179,6 @@ No se ejecutó mutación real contra datos de desarrollo en esta entrega. Sí se
 
 ## Siguiente bloque
 
+Continuación implementada: `docs/frontend-phase-3-engine-pause-resume.md`.
+
 Bloque recomendado: seleccionar una segunda mutación operativa del motor, idealmente `pause` o `resume`, solo después de una auditoría dedicada de estados y de `auto_draw_enabled`.
