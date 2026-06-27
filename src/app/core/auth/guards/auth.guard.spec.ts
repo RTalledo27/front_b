@@ -69,6 +69,13 @@ describe('authentication guards', () => {
     await expect(runGuard(adminGuard, admin, 'admin')).resolves.toBe(true);
   });
 
+  it('keeps the detail route protected for non-admin users as well', async () => {
+    const result = await runGuard(adminGuard, player, 'admin/bingos/game-1');
+    const router = TestBed.inject(Router);
+
+    expect(router.serializeUrl(result as UrlTree)).toBe('/403');
+  });
+
   it('redirects authenticated users away from anonymous auth routes', async () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({

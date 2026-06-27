@@ -95,6 +95,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'bingos/:gameId',
+        title: 'Detalle administrativo del bingo | Fortuna',
+        loadComponent: () =>
+          import('./features/admin-games/pages/admin-game-detail-page/admin-game-detail-page').then(
+            ({ AdminGameDetailPage }) => AdminGameDetailPage,
+          ),
+      },
+      {
         path: 'motor',
         title: 'Motor de juego | Fortuna',
         loadComponent: () =>

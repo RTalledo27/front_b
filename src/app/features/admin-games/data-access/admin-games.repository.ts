@@ -1,19 +1,66 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, InjectionToken } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/api/api.config';
-import { LaravelDataResponse } from '../../../core/api/models/api-response.models';
-import { AdminGameApiDto, AdminGameNumberApiDto, CreateAdminGameDto } from '../models/admin-games.models';
+import { LaravelDataResponse, LaravelPaginatedResponse } from '../../../core/api/models/api-response.models';
+import {
+  AdminGameDetailView,
+  AdminGameListQuery,
+  AdminGameListResult,
+} from '../models/admin-games.models';
+import { mapAdminGameDetailResponse, mapAdminGameListResponse } from './admin-games.mapper';
+
 export interface AdminGamesRepository {
-  create(data:CreateAdminGameDto):Observable<AdminGameApiDto>;transition(id:string,action:'publish'|'open-sales'|'close-sales'):Observable<AdminGameApiDto>;
-  schedule(id:string,date:string):Observable<AdminGameApiDto>;cancel(id:string,reason:string|null):Observable<AdminGameApiDto>;numbers(id:string):Observable<AdminGameNumberApiDto[]>;
+  listGames(query: AdminGameListQuery): Observable<AdminGameListResult>;
+  getGame(gameId: string): Observable<AdminGameDetailView>;
 }
-export const ADMIN_GAMES_REPOSITORY=new InjectionToken<AdminGamesRepository>('ADMIN_GAMES_REPOSITORY');
-@Injectable() export class HttpAdminGamesRepository implements AdminGamesRepository {
-  private readonly http=inject(HttpClient);private readonly base=inject(API_BASE_URL);
-  create(data:CreateAdminGameDto){return this.http.post<LaravelDataResponse<AdminGameApiDto>>(`${this.base}/admin/games`,data).pipe(map(r=>r.data));}
-  transition(id:string,action:'publish'|'open-sales'|'close-sales'){return this.http.post<LaravelDataResponse<AdminGameApiDto>>(`${this.base}/admin/games/${encodeURIComponent(id)}/${action}`,{}).pipe(map(r=>r.data));}
-  schedule(id:string,date:string){return this.http.post<LaravelDataResponse<AdminGameApiDto>>(`${this.base}/admin/games/${encodeURIComponent(id)}/schedule`,{scheduled_start_at:date}).pipe(map(r=>r.data));}
-  cancel(id:string,reason:string|null){return this.http.post<LaravelDataResponse<AdminGameApiDto>>(`${this.base}/admin/games/${encodeURIComponent(id)}/cancel`,{reason}).pipe(map(r=>r.data));}
-  numbers(id:string){return this.http.get<LaravelDataResponse<AdminGameNumberApiDto[]>>(`${this.base}/admin/games/${encodeURIComponent(id)}/numbers`).pipe(map(r=>r.data));}
+
+export const ADMIN_GAMES_REPOSITORY = new InjectionToken<AdminGamesRepository>(
+  'ADMIN_GAMES_REPOSITORY',
+);
+
+@Injectable()
+export class HttpAdminGamesRepository implements AdminGamesRepository {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = inject(API_BASE_URL);
+
+  listGames(query: AdminGameListQuery): Observable<AdminGameListResult> {
+    let params = new HttpParams().set('page', query.page);
+
+    if (query.search.trim() !== '') {
+      params = params.set('search', query.search.trim());
+    }
+
+    if (query.status.trim() !== '') {
+      params = params.set('status', query.status.trim());
+    }
+
+    if (query.published !== null) {
+      params = params.set('published', query.published ? '1' : '0');
+    }
+
+    if (query.autoDrawEnabled !== null) {
+      params = params.set('auto_draw_enabled', query.autoDrawEnabled ? '1' : '0');
+    }
+
+    if (query.createdFrom !== null) {
+      params = params.set('created_from', query.createdFrom);
+    }
+
+    if (query.createdTo !== null) {
+      params = params.set('created_to', query.createdTo);
+    }
+
+    return this.http
+      .get<LaravelPaginatedResponse<unknown>>(`${this.baseUrl}/admin/games`, { params })
+      .pipe(map(mapAdminGameListResponse));
+  }
+
+  getGame(gameId: string): Observable<AdminGameDetailView> {
+    return this.http
+      .get<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
+      )
+      .pipe(map(mapAdminGameDetailResponse));
+  }
 }
