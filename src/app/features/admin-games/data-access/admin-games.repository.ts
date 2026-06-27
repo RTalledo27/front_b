@@ -5,14 +5,18 @@ import { API_BASE_URL } from '../../../core/api/api.config';
 import { LaravelDataResponse, LaravelPaginatedResponse } from '../../../core/api/models/api-response.models';
 import {
   AdminGameDetailView,
+  AdminGameNumbersQuery,
+  AdminGameNumbersResult,
   AdminGameListQuery,
   AdminGameListResult,
 } from '../models/admin-games.models';
+import { mapAdminGameNumbersResponse } from './admin-game-numbers.mapper';
 import { mapAdminGameDetailResponse, mapAdminGameListResponse } from './admin-games.mapper';
 
 export interface AdminGamesRepository {
   listGames(query: AdminGameListQuery): Observable<AdminGameListResult>;
   getGame(gameId: string): Observable<AdminGameDetailView>;
+  listGameNumbers(gameId: string, query: AdminGameNumbersQuery): Observable<AdminGameNumbersResult>;
 }
 
 export const ADMIN_GAMES_REPOSITORY = new InjectionToken<AdminGamesRepository>(
@@ -62,5 +66,11 @@ export class HttpAdminGamesRepository implements AdminGamesRepository {
         `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}`,
       )
       .pipe(map(mapAdminGameDetailResponse));
+  }
+
+  listGameNumbers(gameId: string, _query: AdminGameNumbersQuery): Observable<AdminGameNumbersResult> {
+    return this.http
+      .get<{ data: unknown[] }>(`${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/numbers`)
+      .pipe(map(mapAdminGameNumbersResponse));
   }
 }

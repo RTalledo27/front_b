@@ -17,6 +17,13 @@ export interface AdminGameStatusView {
   isKnown: boolean;
 }
 
+export interface AdminGameNumberStatusView {
+  value: string;
+  label: string;
+  tone: StatusTone;
+  isKnown: boolean;
+}
+
 export interface AdminMoneyView {
   amountCents: number;
   currency: string;
@@ -183,6 +190,33 @@ export interface AdminGameDetailView {
   createdAt: string;
 }
 
+export interface AdminGameNumbersQuery {}
+
+export interface AdminGameNumberReservationView {
+  id: string;
+  orderId: string;
+  orderStatus: string | null;
+  expiresAt: string | null;
+}
+
+export interface AdminGameNumberSoldEntryView {
+  id: string;
+  status: string;
+  confirmedAt: string | null;
+}
+
+export interface AdminGameNumberView {
+  id: string;
+  number: number;
+  status: AdminGameNumberStatusView;
+  activeReservation: AdminGameNumberReservationView | null;
+  soldEntry: AdminGameNumberSoldEntryView | null;
+}
+
+export interface AdminGameNumbersResult {
+  numbers: AdminGameNumberView[];
+}
+
 export type AdminGamesListStatus =
   | 'idle'
   | 'loading'
@@ -202,5 +236,18 @@ export type AdminGameDetailStatus =
   | 'unauthorized'
   | 'forbidden'
   | 'notFound'
+  | 'networkError'
+  | 'unexpectedError';
+
+export type AdminGameNumbersStatus =
+  | 'idle'
+  | 'loading'
+  | 'refreshing'
+  | 'loaded'
+  | 'empty'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'notFound'
+  | 'validationError'
   | 'networkError'
   | 'unexpectedError';

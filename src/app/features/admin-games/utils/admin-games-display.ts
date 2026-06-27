@@ -1,6 +1,9 @@
 import { GameStatus } from '../../../core/api/models/game-api.models';
 import { StatusTone } from '../../../shared/ui/status-badge/status-badge';
-import { AdminGameStatusView } from '../models/admin-games.models';
+import {
+  AdminGameNumberStatusView,
+  AdminGameStatusView,
+} from '../models/admin-games.models';
 
 const knownStatusLabels: Record<GameStatus, string> = {
   draft: 'Borrador',
@@ -13,6 +16,12 @@ const knownStatusLabels: Record<GameStatus, string> = {
   completed: 'Finalizado',
   cancelled: 'Cancelado',
 };
+
+const knownNumberStatusLabels = {
+  available: 'Disponible',
+  reserved: 'Reservado',
+  sold: 'Vendido',
+} as const;
 
 export function buildAdminGameStatus(status: string): AdminGameStatusView {
   if (isKnownGameStatus(status)) {
@@ -36,6 +45,24 @@ export function formatAdminBoolean(value: boolean): string {
   return value ? 'Sí' : 'No';
 }
 
+export function buildAdminGameNumberStatus(status: string): AdminGameNumberStatusView {
+  if (isKnownNumberStatus(status)) {
+    return {
+      value: status,
+      label: knownNumberStatusLabels[status],
+      tone: resolveNumberStatusTone(status),
+      isKnown: true,
+    };
+  }
+
+  return {
+    value: status,
+    label: `Estado no reconocido (${status})`,
+    tone: 'neutral',
+    isKnown: false,
+  };
+}
+
 function isKnownGameStatus(status: string): status is GameStatus {
   return status in knownStatusLabels;
 }
@@ -54,6 +81,23 @@ function resolveStatusTone(status: GameStatus): StatusTone {
       return 'info';
     case 'cancelled':
       return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+function isKnownNumberStatus(status: string): status is keyof typeof knownNumberStatusLabels {
+  return status in knownNumberStatusLabels;
+}
+
+function resolveNumberStatusTone(status: keyof typeof knownNumberStatusLabels): StatusTone {
+  switch (status) {
+    case 'available':
+      return 'success';
+    case 'reserved':
+      return 'warning';
+    case 'sold':
+      return 'info';
     default:
       return 'neutral';
   }

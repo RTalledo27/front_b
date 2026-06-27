@@ -1,9 +1,18 @@
-import { signal } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
+import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailPage } from './admin-game-detail-page';
+
+@Component({
+  selector: 'app-admin-game-numbers-panel',
+  template: '<section data-testid="numbers-panel">Números administrativos</section>',
+})
+class AdminGameNumbersPanelStub {
+  readonly gameId = input.required<string>();
+}
 
 function createFacadeMock() {
   return {
@@ -66,6 +75,10 @@ describe('AdminGameDetailPage', () => {
       ],
     })
       .overrideComponent(AdminGameDetailPage, {
+        remove: { imports: [AdminGameNumbersPanel] },
+        add: { imports: [AdminGameNumbersPanelStub] },
+      })
+      .overrideComponent(AdminGameDetailPage, {
         set: { providers: [{ provide: AdminGameDetailFacade, useValue: facade }] },
       })
       .compileComponents();
@@ -82,6 +95,7 @@ describe('AdminGameDetailPage', () => {
     expect(facade.load).toHaveBeenCalledWith('game-1');
     expect(text).toContain('Bingo Fortuna');
     expect(text).toContain('Capacidad actual');
+    expect(text).toContain('Números administrativos');
     expect(text).not.toContain('Publicar');
     expect(text).not.toContain('Abrir ventas');
   });

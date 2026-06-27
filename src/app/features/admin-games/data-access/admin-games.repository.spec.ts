@@ -140,6 +140,29 @@ describe('HttpAdminGamesRepository', () => {
     await expect(requestPromise).resolves.toMatchObject({ id: 'game id' });
   });
 
+  it('loads admin game numbers from the real game context without invented filters', async () => {
+    const requestPromise = firstValueFrom(repository.listGameNumbers('game 1', {}));
+
+    const request = http.expectOne('/api/v1/admin/games/game%201/numbers');
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.keys()).toEqual([]);
+    request.flush({
+      data: [
+        {
+          id: 'number-1',
+          number: 1,
+          status: 'available',
+          active_reservation: null,
+          sold_entry: null,
+        },
+      ],
+    });
+
+    await expect(requestPromise).resolves.toMatchObject({
+      numbers: [{ id: 'number-1', number: 1 }],
+    });
+  });
+
   it('rejects structurally invalid list payloads safely', async () => {
     const requestPromise = firstValueFrom(
       repository.listGames({
@@ -206,5 +229,22 @@ describe('HttpAdminGamesRepository', () => {
       { status: 422, statusText: 'Unprocessable Entity' },
     );
     await expect(validationPromise).rejects.toBeInstanceOf(HttpErrorResponse);
+
+    const numbersNotFoundPromise = firstValueFrom(repository.listGameNumbers('missing-game', {}));
+    http.expectOne('/api/v1/admin/games/missing-game/numbers').flush(
+      { message: 'game_not_found' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await expect(numbersNotFoundPromise).rejects.toBeInstanceOf(HttpErrorResponse);
+  });
+
+  it('rejects invalid admin numbers payloads safely', async () => {
+    const requestPromise = firstValueFrom(repository.listGameNumbers('broken-game', {}));
+
+    http.expectOne('/api/v1/admin/games/broken-game/numbers').flush({
+      data: [{ id: 'number-1' }],
+    });
+
+    await expect(requestPromise).rejects.toBeInstanceOf(Error);
   });
 });

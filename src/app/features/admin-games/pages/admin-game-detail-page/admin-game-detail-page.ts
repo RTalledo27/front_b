@@ -3,12 +3,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import { formatGameDate, formatMoney } from '../../../public-games/utils/public-game-display';
+import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
 import { formatAdminBoolean } from '../../utils/admin-games-display';
 
 @Component({
   selector: 'app-admin-game-detail-page',
-  imports: [RouterLink, StatusBadge],
+  imports: [RouterLink, StatusBadge, AdminGameNumbersPanel],
   providers: [AdminGameDetailFacade],
   template: `
     <section class="page admin-game-detail-page">
@@ -118,6 +119,8 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
             </p>
             <pre>{{ formatSettings(game.settings) }}</pre>
           </section>
+
+          <app-admin-game-numbers-panel [gameId]="game.id" />
         </div>
       }
     </section>

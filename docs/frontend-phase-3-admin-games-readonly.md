@@ -193,3 +193,7 @@ Smoke deseado:
 ## Siguiente bloque
 
 Recomendado: gestión administrativa read-only de números desde el detalle del juego.
+
+Continuación implementada después de este bloque:
+
+- [Fase 3.2 frontend - Gestión administrativa read-only de números](/C:/Users/rogit/proyectos/rifas/frontend_rifas_app/docs/frontend-phase-3-admin-game-numbers-readonly.md)
