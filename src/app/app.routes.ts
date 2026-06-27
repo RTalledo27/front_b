@@ -95,6 +95,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'bingos/:gameId/motor',
+        title: 'Motor del bingo | Fortuna',
+        loadComponent: () =>
+          import('./features/game-engine/pages/game-engine-page/game-engine-page').then(
+            ({ GameEnginePage }) => GameEnginePage,
+          ),
+      },
+      {
         path: 'bingos/:gameId',
         title: 'Detalle administrativo del bingo | Fortuna',
         loadComponent: () =>
@@ -104,7 +112,7 @@ export const routes: Routes = [
       },
       {
         path: 'motor',
-        title: 'Motor de juego | Fortuna',
+        title: 'Motor técnico | Fortuna',
         loadComponent: () =>
           import('./features/game-engine/pages/game-engine-page/game-engine-page').then(
             ({ GameEnginePage }) => GameEnginePage,

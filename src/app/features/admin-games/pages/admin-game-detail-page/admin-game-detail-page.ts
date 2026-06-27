@@ -55,7 +55,16 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
             <h1>{{ game.name }}</h1>
             <p>{{ game.description || 'Sin descripción administrativa registrada.' }}</p>
           </div>
-          <app-status-badge [tone]="game.status.tone">{{ game.status.label }}</app-status-badge>
+          <div class="header-actions">
+            <app-status-badge [tone]="game.status.tone">{{ game.status.label }}</app-status-badge>
+            <a
+              class="button button--secondary"
+              [routerLink]="['/admin/bingos', game.id, 'motor']"
+              [queryParams]="backQueryParams"
+            >
+              Abrir consola del motor
+            </a>
+          </div>
         </header>
 
         <div class="detail-grid">
@@ -143,6 +152,11 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       margin: 0;
       color: var(--color-text-muted);
     }
+    .header-actions {
+      display: grid;
+      gap: var(--s3);
+      justify-items: end;
+    }
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -204,6 +218,9 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     @media (max-width: 52rem) {
       .detail-grid, .facts--numbers {
         grid-template-columns: 1fr;
+      }
+      .header-actions {
+        justify-items: start;
       }
       .facts div {
         flex-direction: column;

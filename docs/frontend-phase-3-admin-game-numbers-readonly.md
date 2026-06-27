@@ -194,3 +194,6 @@ Smoke deseado:
 ## Siguiente bloque
 
 Recomendado: integración del contexto de juego con consola del motor.
+ContinuaciÃ³n implementada despuÃ©s de este bloque:
+
+- [Fase 3.3 frontend - IntegraciÃ³n del contexto de juego con la consola del motor](/C:/Users/rogit/proyectos/rifas/frontend_rifas_app/docs/frontend-phase-3-game-engine-context.md)

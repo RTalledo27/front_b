@@ -2,8 +2,8 @@ import { Component, input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
 import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
+import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
 import { AdminGameDetailPage } from './admin-game-detail-page';
 
 @Component({
@@ -42,11 +42,31 @@ function createFacadeMock() {
       winner: null,
       commerce: {
         reservations: { total: 5 },
-        orders: { pending: 1, paymentSubmitted: 0, paid: 2, rejected: 0, expired: 0, cancelled: 0, refunded: 0 },
-        payments: { pending: 0, underReview: 1, approved: 2, rejected: 0, cancelled: 0, refunded: 0 },
+        orders: {
+          pending: 1,
+          paymentSubmitted: 0,
+          paid: 2,
+          rejected: 0,
+          expired: 0,
+          cancelled: 0,
+          refunded: 0,
+        },
+        payments: {
+          pending: 0,
+          underReview: 1,
+          approved: 2,
+          rejected: 0,
+          cancelled: 0,
+          refunded: 0,
+        },
         entries: { confirmed: 2, cancelled: 0, refunded: 0, winner: 0 },
       },
-      projection: { drawsTotal: 0, distinctDrawnNumbers: 0, maxCounterHits: 0, lastDrawnNumber: null },
+      projection: {
+        drawsTotal: 0,
+        distinctDrawnNumbers: 0,
+        maxCounterHits: 0,
+        lastDrawnNumber: null,
+      },
       createdBy: 2,
       createdAt: '2026-06-25T09:00:00Z',
     }),
@@ -58,7 +78,10 @@ function createFacadeMock() {
 }
 
 describe('AdminGameDetailPage', () => {
-  async function createComponent(facade = createFacadeMock(), params$?: Subject<ReturnType<typeof convertToParamMap>>) {
+  async function createComponent(
+    facade = createFacadeMock(),
+    params$?: Subject<ReturnType<typeof convertToParamMap>>,
+  ) {
     const paramMap$ = params$ ?? of(convertToParamMap({ gameId: 'game-1' }));
 
     await TestBed.configureTestingModule({
@@ -91,11 +114,16 @@ describe('AdminGameDetailPage', () => {
   it('loads the game from the route param and renders read-only information', async () => {
     const { fixture, facade } = await createComponent();
     const text = fixture.nativeElement.textContent;
+    const html = fixture.nativeElement as HTMLElement;
 
     expect(facade.load).toHaveBeenCalledWith('game-1');
     expect(text).toContain('Bingo Fortuna');
     expect(text).toContain('Capacidad actual');
     expect(text).toContain('Números administrativos');
+    expect(text).toContain('Abrir consola del motor');
+    expect(html.querySelector('a.button--secondary')?.getAttribute('href')).toContain(
+      '/admin/bingos/game-1/motor',
+    );
     expect(text).not.toContain('Publicar');
     expect(text).not.toContain('Abrir ventas');
   });
