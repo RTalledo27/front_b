@@ -1,4 +1,4 @@
-import { signal } from '@angular/core';
+﻿import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -15,6 +15,7 @@ function createFacadeMock() {
     pauseGame: vi.fn(),
     resumeGame: vi.fn(),
     drawNumber: vi.fn(),
+    rebuildCounters: vi.fn(),
     snapshot: signal<GameEngineConsoleView | null>({
       context: {
         id: 'game-1',
@@ -169,6 +170,30 @@ function createFacadeMock() {
       drawnAt: string;
       replay: boolean;
     } | null>(null),
+    rebuildStatus: signal<
+      | 'idle'
+      | 'submitting'
+      | 'success'
+      | 'conflict'
+      | 'unauthorized'
+      | 'forbidden'
+      | 'notFound'
+      | 'invalidState'
+      | 'networkError'
+      | 'unexpectedError'
+    >('idle'),
+    rebuildError: signal<{ message: string } | null>(null),
+    rebuildResult: signal<{
+      gameId: string;
+      outcome: 'rebuilt' | 'already_consistent';
+      previousRows: number;
+      previousHitsTotal: number;
+      rebuiltRows: number;
+      rebuiltHitsTotal: number;
+      totalDraws: number;
+      maxSequence: number;
+      rebuiltAt: string;
+    } | null>(null),
   };
 }
 
@@ -208,7 +233,8 @@ describe('GameEnginePage', () => {
     expect(text).not.toContain('Pausar juego');
     expect(text).not.toContain('Reanudar juego');
     expect(text).not.toContain('Sortear número');
-    expect(text).not.toContain('Reconstruir contadores');
+    expect(text).toContain('Herramientas técnicas');
+    expect(text).toContain('Reconstruir counters');
   });
 
   it('shows the pause action only when the contextual snapshot is pausable', async () => {
@@ -272,7 +298,7 @@ describe('GameEnginePage', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(text).toContain('Sortear número');
-    expect(text).not.toContain('Reconstruir contadores');
+    expect(text).toContain('Reconstruir counters');
   });
 
   it('hides the draw action when automation is active', async () => {
@@ -474,6 +500,132 @@ describe('GameEnginePage', () => {
 
     const fixture = await renderPage(facade);
     expect(fixture.nativeElement.textContent).toContain('Puedes reintentar con seguridad');
+  });
+
+  it('shows the rebuild tool as a secondary technical action when the backend contract allows it', async () => {
+    const facade = createFacadeMock();
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Herramientas técnicas');
+    expect(text).toContain('Reconstruir counters');
+    expect(text).toContain('No forman parte del flujo operativo principal del juego.');
+  });
+
+  it('hides the rebuild action when the snapshot is in resolving state', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'resolving', label: 'Resolviendo', tone: 'warning', isKnown: true },
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).not.toContain('Reconstruir counters');
+    expect(text).not.toContain('Herramientas técnicas');
+  });
+
+  it('opens confirmation and submits rebuild once', async () => {
+    const facade = createFacadeMock();
+    const fixture = await renderPage(facade);
+    const element = fixture.nativeElement as HTMLElement;
+
+    const openButton = Array.from(element.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Reconstruir counters'),
+    ) as HTMLButtonElement | undefined;
+
+    expect(openButton).toBeDefined();
+    openButton?.click();
+    fixture.detectChanges();
+
+    expect(document.activeElement?.textContent).toContain('Confirmar reconstrucción');
+
+    const confirmButton = Array.from(element.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Confirmar reconstrucción'),
+    ) as HTMLButtonElement | undefined;
+
+    expect(confirmButton).toBeDefined();
+    confirmButton?.click();
+
+    expect(facade.rebuildCounters).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels rebuild confirmation without mutating and restores focus', async () => {
+    const facade = createFacadeMock();
+    const fixture = await renderPage(facade);
+    const element = fixture.nativeElement as HTMLElement;
+
+    const openButton = Array.from(element.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Reconstruir counters'),
+    ) as HTMLButtonElement | undefined;
+
+    expect(openButton).toBeDefined();
+    openButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+
+    fixture.componentInstance.closeAnyConfirmation();
+    fixture.detectChanges();
+
+    expect(facade.rebuildCounters).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(openButton);
+    expect(element.textContent).not.toContain('Confirmar reconstrucción técnica');
+  });
+
+  it('shows rebuild success feedback for rebuilt counters', async () => {
+    const facade = createFacadeMock();
+    facade.rebuildStatus.set('success');
+    facade.rebuildResult.set({
+      gameId: 'game-1',
+      outcome: 'rebuilt',
+      previousRows: 4,
+      previousHitsTotal: 9,
+      rebuiltRows: 7,
+      rebuiltHitsTotal: 14,
+      totalDraws: 7,
+      maxSequence: 7,
+      rebuiltAt: '2026-06-27T12:20:00Z',
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain(
+      'Laravel reconstruyó 7 counters con 14 hits acumulados.',
+    );
+  });
+
+  it('shows rebuild informational success feedback when counters are already consistent', async () => {
+    const facade = createFacadeMock();
+    facade.rebuildStatus.set('success');
+    facade.rebuildResult.set({
+      gameId: 'game-1',
+      outcome: 'already_consistent',
+      previousRows: 7,
+      previousHitsTotal: 14,
+      rebuiltRows: 7,
+      rebuiltHitsTotal: 14,
+      totalDraws: 7,
+      maxSequence: 7,
+      rebuiltAt: '2026-06-27T12:20:00Z',
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain(
+      'Laravel confirmó que los counters ya estaban consistentes.',
+    );
+  });
+
+  it('shows rebuild conflict feedback when Laravel rejects the technical command', async () => {
+    const facade = createFacadeMock();
+    facade.rebuildStatus.set('conflict');
+    facade.rebuildError.set({ message: 'rebuild_integrity_violation' });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain(
+      'inconsistencia de integridad al reconstruir counters',
+    );
   });
 
   it('shows the secondary manual UUID access when there is no contextual game', async () => {

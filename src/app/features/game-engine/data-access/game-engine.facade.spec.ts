@@ -8,6 +8,7 @@ import { AdminGameDetailView } from '../../admin-games/models/admin-games.models
 import {
   GameEngineDrawCommandView,
   GameEnginePauseCommandView,
+  GameEngineRebuildCountersCommandView,
   GameEngineResumeCommandView,
   GameEngineStartCommandView,
 } from '../models/game-engine.models';
@@ -270,6 +271,22 @@ function createReplayResult(command: EngineCommand): CommandResultMap[EngineComm
   }
 }
 
+function createRebuildResult(
+  outcome: GameEngineRebuildCountersCommandView['outcome'] = 'rebuilt',
+): GameEngineRebuildCountersCommandView {
+  return {
+    gameId: 'game-1',
+    outcome,
+    previousRows: 4,
+    previousHitsTotal: 9,
+    rebuiltRows: 7,
+    rebuiltHitsTotal: 14,
+    totalDraws: 7,
+    maxSequence: 7,
+    rebuiltAt: '2026-06-27T12:20:00Z',
+  };
+}
+
 describe('GameEngineFacade', () => {
   function asDrawRequest(
     request: (gameId: string, commandId: string) => Observable<GameEngineDrawCommandView>,
@@ -286,6 +303,7 @@ describe('GameEngineFacade', () => {
     pauseRequest?: () => Observable<GameEnginePauseCommandView>;
     resumeRequest?: () => Observable<GameEngineResumeCommandView>;
     drawRequest?: (gameId: string, commandId: string) => Observable<GameEngineDrawCommandView>;
+    rebuildRequest?: () => Observable<GameEngineRebuildCountersCommandView>;
     user?: ReturnType<typeof signal<{ id: number } | null>>;
   }) {
     const user = overrides?.user ?? signal<{ id: number } | null>({ id: 7 });
@@ -320,6 +338,11 @@ describe('GameEngineFacade', () => {
       drawNumber: vi.fn(
         overrides?.drawRequest ??
           (() => new Subject<GameEngineDrawCommandView>() as Observable<GameEngineDrawCommandView>),
+      ),
+      rebuildCounters: vi.fn(
+        overrides?.rebuildRequest ??
+          (() =>
+            new Subject<GameEngineRebuildCountersCommandView>() as Observable<GameEngineRebuildCountersCommandView>),
       ),
     };
 
@@ -1310,4 +1333,282 @@ describe('GameEngineFacade', () => {
     expect(facade.drawStatus()).toBe('success');
     expect(facade.drawResult()?.replay).toBe(true);
   });
+
+  it('submits rebuild successfully and refreshes the console', () => {
+    const refreshedContext = createContext('game-1', {
+      status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+      lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      projection: { drawsTotal: 7, distinctDrawnNumbers: 7, maxCounterHits: 3, lastDrawnNumber: 42 },
+    });
+
+    const { facade, engineRepository, adminRepository } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+              lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+            }),
+          ),
+        )
+        .mockReturnValueOnce(settledStream(refreshedContext)),
+      drawsRequest: vi.fn().mockReturnValue(settledStream([])),
+      countersRequest: vi.fn().mockReturnValue(settledStream([])),
+      winnerRequest: settledWinnerRequest,
+      rebuildRequest: () => settledStream(createRebuildResult()),
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.rebuildCounters();
+
+    expect(engineRepository.rebuildCounters).toHaveBeenCalledWith('game-1');
+    expect(facade.rebuildStatus()).toBe('success');
+    expect(facade.rebuildResult()?.outcome).toBe('rebuilt');
+    expect(adminRepository.getGame).toHaveBeenCalledTimes(2);
+    expect(facade.status()).toBe('loaded');
+    expect(facade.snapshot()?.context.projection.drawsTotal).toBe(7);
+  });
+
+  it('treats already_consistent rebuild as a successful informational response', () => {
+    const { facade } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'paused', label: 'Pausado', tone: 'warning', isKnown: true },
+              lifecycle: {
+                startedAt: '2026-06-27T12:05:00Z',
+                pausedAt: '2026-06-27T12:10:00Z',
+                completedAt: null,
+              },
+            }),
+          ),
+        )
+        .mockReturnValueOnce(
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'paused', label: 'Pausado', tone: 'warning', isKnown: true },
+              lifecycle: {
+                startedAt: '2026-06-27T12:05:00Z',
+                pausedAt: '2026-06-27T12:10:00Z',
+                completedAt: null,
+              },
+            }),
+          ),
+        ),
+      drawsRequest: vi.fn().mockReturnValue(settledStream([])),
+      countersRequest: vi.fn().mockReturnValue(settledStream([])),
+      winnerRequest: settledWinnerRequest,
+      rebuildRequest: () => settledStream(createRebuildResult('already_consistent')),
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.rebuildCounters();
+
+    expect(facade.rebuildStatus()).toBe('success');
+    expect(facade.rebuildResult()?.outcome).toBe('already_consistent');
+  });
+
+  it('blocks double submit while rebuild is in flight', () => {
+    const rebuild$ = new Subject<GameEngineRebuildCountersCommandView>();
+    const { facade, engineRepository } = setup({
+      contextRequest: () =>
+        settledStream(
+          createContext('game-1', {
+            status: { value: 'completed', label: 'Completado', tone: 'success', isKnown: true },
+            lifecycle: {
+              startedAt: '2026-06-27T12:05:00Z',
+              pausedAt: null,
+              completedAt: '2026-06-27T12:20:00Z',
+            },
+          }),
+        ),
+      drawsRequest: () => settledStream([]),
+      countersRequest: () => settledStream([]),
+      winnerRequest: settledWinnerRequest,
+      rebuildRequest: () => rebuild$,
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.rebuildCounters();
+    facade.rebuildCounters();
+
+    expect(engineRepository.rebuildCounters).toHaveBeenCalledTimes(1);
+    expect(facade.rebuildStatus()).toBe('submitting');
+  });
+
+  it('ignores late rebuild responses after a fast game change', () => {
+    const firstContext$ = new Subject<AdminGameDetailView>();
+    const secondContext$ = new Subject<AdminGameDetailView>();
+    const drawsA$ = new Subject<unknown[]>();
+    const drawsB$ = new Subject<unknown[]>();
+    const countersA$ = new Subject<unknown[]>();
+    const countersB$ = new Subject<unknown[]>();
+    const winnerA$ = new Subject<unknown>();
+    const winnerB$ = new Subject<unknown>();
+    const rebuild$ = new Subject<GameEngineRebuildCountersCommandView>();
+
+    const adminRepository = {
+      getGame: vi.fn().mockReturnValueOnce(firstContext$).mockReturnValueOnce(secondContext$),
+    };
+    const engineRepository = {
+      listDraws: vi.fn().mockReturnValueOnce(drawsA$).mockReturnValueOnce(drawsB$),
+      listCounters: vi.fn().mockReturnValueOnce(countersA$).mockReturnValueOnce(countersB$),
+      getWinner: vi.fn().mockReturnValueOnce(winnerA$).mockReturnValueOnce(winnerB$),
+      startGame: vi.fn(),
+      pauseGame: vi.fn(),
+      resumeGame: vi.fn(),
+      drawNumber: vi.fn(),
+      rebuildCounters: vi.fn(() => rebuild$),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        GameEngineFacade,
+        DrawCommandIdService,
+        { provide: ADMIN_GAMES_REPOSITORY, useValue: adminRepository },
+        { provide: GAME_ENGINE_REPOSITORY, useValue: engineRepository },
+        { provide: AuthSessionService, useValue: { user: signal({ id: 7 }) } },
+      ],
+    });
+
+    const facade = TestBed.inject(GameEngineFacade);
+    facade.load('game-1', 'contextual');
+    settleLoadedSubjects({
+      context$: firstContext$,
+      draws$: drawsA$,
+      counters$: countersA$,
+      winner$: winnerA$,
+      context: createContext('game-1', {
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      }),
+    });
+
+    facade.rebuildCounters();
+    facade.load('game-2', 'contextual');
+    settleLoadedSubjects({
+      context$: secondContext$,
+      draws$: drawsB$,
+      counters$: countersB$,
+      winner$: winnerB$,
+      context: createContext('game-2'),
+    });
+
+    rebuild$.next(createRebuildResult());
+    rebuild$.complete();
+
+    expect(facade.rebuildStatus()).toBe('idle');
+    expect(facade.rebuildResult()).toBeNull();
+    expect(facade.snapshot()?.context.id).toBe('game-2');
+  });
+
+  it('ignores late rebuild responses after logout', () => {
+    const rebuild$ = new Subject<GameEngineRebuildCountersCommandView>();
+    const user = signal<{ id: number } | null>({ id: 7 });
+
+    const { facade } = setup({
+      contextRequest: () =>
+        settledStream(
+          createContext('game-1', {
+            status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+            lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+          }),
+        ),
+      drawsRequest: () => settledStream([]),
+      countersRequest: () => settledStream([]),
+      winnerRequest: settledWinnerRequest,
+      rebuildRequest: () => rebuild$,
+      user,
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.rebuildCounters();
+    user.set(null);
+    rebuild$.next(createRebuildResult());
+    rebuild$.complete();
+
+    expect(facade.rebuildStatus()).toBe('submitting');
+    expect(facade.rebuildResult()).toBeNull();
+  });
+
+  it('keeps the rebuild success but surfaces a failed refresh independently', () => {
+    const { facade } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+              lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+            }),
+          ),
+        )
+        .mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 0, error: new ProgressEvent('error') })),
+        ),
+      drawsRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream([]))
+        .mockReturnValueOnce(settledStream([])),
+      countersRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream([]))
+        .mockReturnValueOnce(settledStream([])),
+      winnerRequest: vi.fn().mockReturnValue(settledWinnerRequest()),
+      rebuildRequest: () => settledStream(createRebuildResult()),
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.rebuildCounters();
+
+    expect(facade.rebuildStatus()).toBe('success');
+    expect(facade.rebuildResult()?.outcome).toBe('rebuilt');
+    expect(facade.status()).toBe('networkError');
+    expect(facade.error()).not.toBeNull();
+  });
+
+  for (const [httpStatus, expectedStatus] of [
+    [401, 'unauthorized'],
+    [403, 'forbidden'],
+    [404, 'notFound'],
+    [409, 'conflict'],
+    [422, 'invalidState'],
+    [0, 'networkError'],
+    [500, 'unexpectedError'],
+  ] as const) {
+    it(`maps rebuild ${httpStatus} failures to ${expectedStatus}`, () => {
+      const { facade } = setup({
+        contextRequest: () =>
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+              lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+            }),
+          ),
+        drawsRequest: () => settledStream([]),
+        countersRequest: () => settledStream([]),
+        winnerRequest: settledWinnerRequest,
+        rebuildRequest: () =>
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: httpStatus,
+                error:
+                  httpStatus === 0
+                    ? new ProgressEvent('error')
+                    : { message: `rebuild_${httpStatus}` },
+              }),
+          ),
+      });
+
+      facade.load('game-1', 'contextual');
+      facade.rebuildCounters();
+
+      expect(facade.rebuildStatus()).toBe(expectedStatus);
+      expect(facade.rebuildError()).not.toBeNull();
+    });
+  }
 });

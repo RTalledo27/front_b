@@ -4,6 +4,7 @@ import {
   mapGameEngineDrawCommandResponse,
   mapGameEngineDrawsResponse,
   mapGameEnginePauseResponse,
+  mapGameEngineRebuildCountersResponse,
   mapGameEngineResumeResponse,
   mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
@@ -258,6 +259,71 @@ describe('game-engine.mapper', () => {
     expect(result.gameStatus).toBe('completed');
   });
 
+  it('maps the rebuild command resource envelope', () => {
+    const result = mapGameEngineRebuildCountersResponse({
+      data: {
+        game_id: 'game-1',
+        outcome: 'rebuilt',
+        previous_rows: 1,
+        previous_hits_total: 2,
+        rebuilt_rows: 3,
+        rebuilt_hits_total: 7,
+        total_draws: 7,
+        max_sequence: 7,
+        rebuilt_at: '2026-06-27T12:20:00Z',
+        ignored_field: 'safe',
+      },
+    });
+
+    expect(result).toEqual({
+      gameId: 'game-1',
+      outcome: 'rebuilt',
+      previousRows: 1,
+      previousHitsTotal: 2,
+      rebuiltRows: 3,
+      rebuiltHitsTotal: 7,
+      totalDraws: 7,
+      maxSequence: 7,
+      rebuiltAt: '2026-06-27T12:20:00Z',
+    });
+  });
+
+  it('maps the already_consistent rebuild resource envelope', () => {
+    const result = mapGameEngineRebuildCountersResponse({
+      data: {
+        game_id: 'game-1',
+        outcome: 'already_consistent',
+        previous_rows: 0,
+        previous_hits_total: 0,
+        rebuilt_rows: 0,
+        rebuilt_hits_total: 0,
+        total_draws: 0,
+        max_sequence: 0,
+        rebuilt_at: '2026-06-27T12:20:00Z',
+      },
+    });
+
+    expect(result.outcome).toBe('already_consistent');
+    expect(result.rebuiltRows).toBe(0);
+  });
+
+  it('rejects an incomplete rebuild payload', () => {
+    expect(() =>
+      mapGameEngineRebuildCountersResponse({
+        data: {
+          game_id: 'game-1',
+          outcome: 'rebuilt',
+          previous_rows: 1,
+          previous_hits_total: 2,
+          rebuilt_rows: 3,
+          rebuilt_hits_total: 7,
+          total_draws: 7,
+          rebuilt_at: '2026-06-27T12:20:00Z',
+        },
+      }),
+    ).toThrowError();
+  });
+
   it('rejects malformed payloads', () => {
     expect(() => mapGameEngineCountersResponse({ data: {}, meta: null })).toThrowError();
     expect(() =>
@@ -359,6 +425,51 @@ describe('game-engine.mapper', () => {
           game_status: 'running',
           drawn_at: 'bad-date',
           replay: false,
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineRebuildCountersResponse({
+        data: {
+          game_id: 'game-1',
+          outcome: 'bad_outcome',
+          previous_rows: 0,
+          previous_hits_total: 0,
+          rebuilt_rows: 0,
+          rebuilt_hits_total: 0,
+          total_draws: 0,
+          max_sequence: 0,
+          rebuilt_at: '2026-06-27T12:20:00Z',
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineRebuildCountersResponse({
+        data: {
+          game_id: 'game-1',
+          outcome: 'rebuilt',
+          previous_rows: -1,
+          previous_hits_total: 0,
+          rebuilt_rows: 0,
+          rebuilt_hits_total: 0,
+          total_draws: 0,
+          max_sequence: 0,
+          rebuilt_at: '2026-06-27T12:20:00Z',
+        },
+      }),
+    ).toThrowError();
+    expect(() =>
+      mapGameEngineRebuildCountersResponse({
+        data: {
+          game_id: 'game-1',
+          outcome: 'rebuilt',
+          previous_rows: 0,
+          previous_hits_total: 0,
+          rebuilt_rows: 0,
+          rebuilt_hits_total: 0,
+          total_draws: 0,
+          max_sequence: 0,
+          rebuilt_at: 'not-a-date',
         },
       }),
     ).toThrowError();

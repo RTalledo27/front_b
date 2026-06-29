@@ -11,6 +11,7 @@ import {
   GameEngineDrawCommandView,
   GameEngineDrawView,
   GameEnginePauseCommandView,
+  GameEngineRebuildCountersCommandView,
   GameEngineResumeCommandView,
   GameEngineStartCommandView,
   GameEngineWinnerView,
@@ -20,6 +21,7 @@ import {
   mapGameEngineDrawCommandResponse,
   mapGameEngineDrawsResponse,
   mapGameEnginePauseResponse,
+  mapGameEngineRebuildCountersResponse,
   mapGameEngineResumeResponse,
   mapGameEngineStartResponse,
   mapGameEngineWinnerResponse,
@@ -33,6 +35,7 @@ export interface GameEngineRepository {
   pauseGame(gameId: string): Observable<GameEnginePauseCommandView>;
   resumeGame(gameId: string): Observable<GameEngineResumeCommandView>;
   drawNumber(gameId: string, commandId: string): Observable<GameEngineDrawCommandView>;
+  rebuildCounters(gameId: string): Observable<GameEngineRebuildCountersCommandView>;
 }
 
 export const GAME_ENGINE_REPOSITORY = new InjectionToken<GameEngineRepository>(
@@ -109,5 +112,14 @@ export class HttpGameEngineRepository implements GameEngineRepository {
         },
       )
       .pipe(map(mapGameEngineDrawCommandResponse));
+  }
+
+  rebuildCounters(gameId: string): Observable<GameEngineRebuildCountersCommandView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/counters/rebuild`,
+        null,
+      )
+      .pipe(map(mapGameEngineRebuildCountersResponse));
   }
 }

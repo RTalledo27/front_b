@@ -216,4 +216,4 @@ Smoke recomendado con Angular + Laravel locales y datos seguros:
 
 ## Siguiente bloque
 
-Bloque recomendado: `rebuild counters como herramienta técnica`.
+Continuación implementada en `docs/frontend-phase-3-engine-rebuild-counters.md`.

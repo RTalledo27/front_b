@@ -14,6 +14,8 @@ import {
   GameEnginePauseCommandView,
   GameEnginePauseStatus,
   GameEnginePageStatus,
+  GameEngineRebuildCountersCommandView,
+  GameEngineRebuildStatus,
   GameEngineResumeCommandView,
   GameEngineResumeStatus,
   GameEngineStartCommandView,
@@ -37,6 +39,7 @@ export class GameEngineFacade {
   private pauseSequence = 0;
   private resumeSequence = 0;
   private drawSequence = 0;
+  private rebuildSequence = 0;
 
   readonly snapshot = signal<GameEngineConsoleView | null>(null);
   readonly status = signal<GameEnginePageStatus>('idle');
@@ -54,6 +57,9 @@ export class GameEngineFacade {
   readonly drawStatus = signal<GameEngineDrawStatus>('idle');
   readonly drawError = signal<ApiError | null>(null);
   readonly drawResult = signal<GameEngineDrawCommandView | null>(null);
+  readonly rebuildStatus = signal<GameEngineRebuildStatus>('idle');
+  readonly rebuildError = signal<ApiError | null>(null);
+  readonly rebuildResult = signal<GameEngineRebuildCountersCommandView | null>(null);
 
   load(gameId: string, accessMode: GameEngineAccessMode): void {
     const normalizedGameId = gameId.trim();
@@ -125,6 +131,7 @@ export class GameEngineFacade {
     this.pauseSequence += 1;
     this.resumeSequence += 1;
     this.drawSequence += 1;
+    this.rebuildSequence += 1;
     this.snapshot.set(null);
     this.error.set(null);
     this.status.set('idle');
@@ -146,6 +153,9 @@ export class GameEngineFacade {
     this.drawStatus.set('idle');
     this.drawError.set(null);
     this.drawResult.set(null);
+    this.rebuildStatus.set('idle');
+    this.rebuildError.set(null);
+    this.rebuildResult.set(null);
   }
 
   startGame(): void {
@@ -322,6 +332,47 @@ export class GameEngineFacade {
       });
   }
 
+  rebuildCounters(): void {
+    if (!this.canSubmitCommand(this.rebuildStatus())) {
+      return;
+    }
+
+    const sequence = this.rebuildSequence + 1;
+    this.rebuildSequence = sequence;
+    const gameId = this.activeGameId;
+    const requestUserId = this.session.user()?.id ?? null;
+
+    this.rebuildStatus.set('submitting');
+    this.rebuildError.set(null);
+    this.rebuildResult.set(null);
+
+    this.repository
+      .rebuildCounters(gameId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          if (!this.isCurrentRebuildRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          this.rebuildResult.set(result);
+          this.rebuildError.set(null);
+          this.rebuildStatus.set('success');
+          this.refresh();
+        },
+        error: (error: unknown) => {
+          if (!this.isCurrentRebuildRequest(sequence, gameId, requestUserId)) {
+            return;
+          }
+
+          const apiError = toApiError(error);
+          this.rebuildResult.set(null);
+          this.rebuildError.set(apiError);
+          this.rebuildStatus.set(resolveCommandStatus(apiError));
+        },
+      });
+  }
+
   private loadWinnerOrNull(gameId: string) {
     return this.repository.getWinner(gameId).pipe(
       catchError((error: unknown) => {
@@ -370,6 +421,18 @@ export class GameEngineFacade {
   private isCurrentDrawRequest(sequence: number, gameId: string, requestUserId: number | null): boolean {
     return (
       sequence === this.drawSequence &&
+      gameId === this.activeGameId &&
+      (this.session.user()?.id ?? null) === requestUserId
+    );
+  }
+
+  private isCurrentRebuildRequest(
+    sequence: number,
+    gameId: string,
+    requestUserId: number | null,
+  ): boolean {
+    return (
+      sequence === this.rebuildSequence &&
       gameId === this.activeGameId &&
       (this.session.user()?.id ?? null) === requestUserId
     );

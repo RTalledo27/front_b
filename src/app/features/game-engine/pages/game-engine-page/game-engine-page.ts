@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -32,7 +32,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           <h1>Consola contextual del juego</h1>
           <p>
             Esta fase habilita transiciones auditadas del motor usando el UUID real del juego y
-            habilitando draw manual con idempotencia y manteniendo rebuild fuera de alcance.
+            mantiene rebuild counters como herramienta técnica secundaria, separada de las
+            mutaciones operativas principales.
           </p>
         </div>
       </header>
@@ -358,10 +359,95 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
           </section>
         }
 
-        <p class="read-only-note" aria-live="polite">
-          Rebuild sigue fuera de este bloque. Solo se habilitan las mutaciones del motor que el
-          backend soporta de forma explícita.
+                <p class="read-only-note" aria-live="polite">
+          Las acciones operativas y las herramientas técnicas se separan visualmente. Rebuild
+          counters solo aparece cuando el contrato backend real la soporta de forma explícita.
         </p>
+
+        @if (showTechnicalTools()) {
+          <section class="surface-card technical-panel" aria-live="polite">
+            <div class="technical-panel__header">
+              <div>
+                <h3>Herramientas técnicas</h3>
+                <p>
+                  Estas acciones recalculan proyecciones derivadas desde el historial real de
+                  Laravel. No forman parte del flujo operativo principal del juego.
+                </p>
+              </div>
+            </div>
+
+            <div class="technical-actions">
+              @if (canRebuildCounters()) {
+                <button
+                  #openRebuildButton
+                  class="button button--secondary"
+                  type="button"
+                  [disabled]="facade.rebuildStatus() === 'submitting'"
+                  (click)="openRebuildConfirmation()"
+                >
+                  {{
+                    facade.rebuildStatus() === 'submitting'
+                      ? 'Reconstruyendo…'
+                      : 'Reconstruir counters'
+                  }}
+                </button>
+              }
+            </div>
+
+            @if (showRebuildConfirmation()) {
+              <div
+                class="confirm-box technical-confirm-box"
+                role="alertdialog"
+                aria-labelledby="rebuild-confirm-title"
+                aria-modal="false"
+              >
+                <h4 id="rebuild-confirm-title">Confirmar reconstrucción técnica</h4>
+                <p>
+                  Esta acción recalcula game_number_counters desde game_draws sin modificar
+                  draws, winner ni estados del juego. Úsala solo como herramienta administrativa
+                  secundaria.
+                </p>
+                <div class="confirm-box__actions">
+                  <button
+                    #confirmRebuildButton
+                    class="button"
+                    type="button"
+                    [disabled]="facade.rebuildStatus() === 'submitting'"
+                    (click)="rebuildCounters()"
+                  >
+                    Confirmar reconstrucción
+                  </button>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="facade.rebuildStatus() === 'submitting'"
+                    (click)="closeRebuildConfirmation()"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (facade.rebuildStatus() === 'success' && facade.rebuildResult(); as rebuildResult) {
+              <p class="feedback feedback--success" role="status">
+                {{
+                  rebuildResult.outcome === 'already_consistent'
+                    ? 'Laravel confirmó que los counters ya estaban consistentes.'
+                    : 'Laravel reconstruyó ' +
+                      rebuildResult.rebuiltRows +
+                      ' counters con ' +
+                      rebuildResult.rebuiltHitsTotal +
+                      ' hits acumulados.'
+                }}
+              </p>
+            } @else if (facade.rebuildError()) {
+              <p class="feedback feedback--error" role="alert">
+                {{ rebuildErrorMessage() }}
+              </p>
+            }
+          </section>
+        }
 
         <div class="summary-grid">
           <article class="surface-card panel">
@@ -526,6 +612,11 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       display: grid;
       gap: var(--s3);
     }
+    .technical-panel {
+      display: grid;
+      gap: var(--s3);
+      border: 1px dashed var(--color-border);
+    }
     .start-panel__header {
       display: flex;
       gap: var(--s4);
@@ -537,11 +628,25 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       flex-wrap: wrap;
       gap: var(--s3);
     }
+    .technical-panel__header {
+      display: flex;
+      gap: var(--s4);
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .technical-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s3);
+    }
     .confirm-box {
       padding: var(--s4);
       border: 1px solid var(--color-border);
       border-radius: var(--r-md);
       background: var(--neutral-50);
+    }
+    .technical-confirm-box {
+      background: #fff7ed;
     }
     .confirm-box h4,
     .confirm-box p {
@@ -643,7 +748,9 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       .facts div,
       .counter-number,
       .start-panel__header,
-      .command-actions {
+      .technical-panel__header,
+      .command-actions,
+      .technical-actions {
         grid-template-columns: 1fr;
         display: grid;
       }
@@ -666,6 +773,9 @@ export class GameEnginePage {
   private readonly confirmResumeButton = viewChild<ElementRef<HTMLButtonElement>>('confirmResumeButton');
   private readonly openDrawButton = viewChild<ElementRef<HTMLButtonElement>>('openDrawButton');
   private readonly confirmDrawButton = viewChild<ElementRef<HTMLButtonElement>>('confirmDrawButton');
+  private readonly openRebuildButton = viewChild<ElementRef<HTMLButtonElement>>('openRebuildButton');
+  private readonly confirmRebuildButton =
+    viewChild<ElementRef<HTMLButtonElement>>('confirmRebuildButton');
 
   readonly facade = inject(GameEngineFacade);
   readonly manualGameId = new FormControl('', { nonNullable: true });
@@ -685,6 +795,12 @@ export class GameEnginePage {
       this.facade.pauseResult() !== null ||
       this.facade.resumeResult() !== null ||
       this.facade.drawResult() !== null,
+  );
+  readonly showTechnicalTools = computed(
+    () =>
+      this.canRebuildCounters() ||
+      this.facade.rebuildError() !== null ||
+      this.facade.rebuildResult() !== null,
   );
   readonly canStartGame = computed(() => {
     const context = this.facade.snapshot()?.context;
@@ -746,10 +862,19 @@ export class GameEnginePage {
       this.winner() === null
     );
   });
+  readonly canRebuildCounters = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    return context.status.value !== 'resolving';
+  });
   readonly showStartConfirmation = signal(false);
   readonly showPauseConfirmation = signal(false);
   readonly showResumeConfirmation = signal(false);
   readonly showDrawConfirmation = signal(false);
+  readonly showRebuildConfirmation = signal(false);
   backQueryParams: Params = {};
 
   constructor() {
@@ -771,6 +896,11 @@ export class GameEnginePage {
     effect(() => {
       if (this.showDrawConfirmation()) {
         this.confirmDrawButton()?.nativeElement.focus();
+      }
+    });
+    effect(() => {
+      if (this.showRebuildConfirmation()) {
+        this.confirmRebuildButton()?.nativeElement.focus();
       }
     });
 
@@ -813,6 +943,7 @@ export class GameEnginePage {
     this.showPauseConfirmation.set(false);
     this.showResumeConfirmation.set(false);
     this.showDrawConfirmation.set(false);
+    this.showRebuildConfirmation.set(false);
     this.showStartConfirmation.set(true);
   }
 
@@ -833,6 +964,7 @@ export class GameEnginePage {
     this.showStartConfirmation.set(false);
     this.showResumeConfirmation.set(false);
     this.showDrawConfirmation.set(false);
+    this.showRebuildConfirmation.set(false);
     this.showPauseConfirmation.set(true);
   }
 
@@ -853,6 +985,7 @@ export class GameEnginePage {
     this.showStartConfirmation.set(false);
     this.showPauseConfirmation.set(false);
     this.showDrawConfirmation.set(false);
+    this.showRebuildConfirmation.set(false);
     this.showResumeConfirmation.set(true);
   }
 
@@ -870,6 +1003,7 @@ export class GameEnginePage {
     this.closePauseConfirmation();
     this.closeResumeConfirmation();
     this.closeDrawConfirmation();
+    this.closeRebuildConfirmation();
   }
 
   startGame(): void {
@@ -896,6 +1030,7 @@ export class GameEnginePage {
     this.showPauseConfirmation.set(false);
     this.showResumeConfirmation.set(false);
     this.showDrawConfirmation.set(true);
+    this.showRebuildConfirmation.set(false);
   }
 
   closeDrawConfirmation(): void {
@@ -910,6 +1045,32 @@ export class GameEnginePage {
   drawNumber(): void {
     this.showDrawConfirmation.set(false);
     this.facade.drawNumber();
+  }
+
+  openRebuildConfirmation(): void {
+    if (!this.canRebuildCounters() || this.facade.rebuildStatus() === 'submitting') {
+      return;
+    }
+
+    this.showStartConfirmation.set(false);
+    this.showPauseConfirmation.set(false);
+    this.showResumeConfirmation.set(false);
+    this.showDrawConfirmation.set(false);
+    this.showRebuildConfirmation.set(true);
+  }
+
+  closeRebuildConfirmation(): void {
+    if (!this.showRebuildConfirmation() || this.facade.rebuildStatus() === 'submitting') {
+      return;
+    }
+
+    this.showRebuildConfirmation.set(false);
+    this.openRebuildButton()?.nativeElement.focus();
+  }
+
+  rebuildCounters(): void {
+    this.showRebuildConfirmation.set(false);
+    this.facade.rebuildCounters();
   }
 
   startErrorMessage(): string {
@@ -980,6 +1141,23 @@ export class GameEnginePage {
     return error.message;
   }
 
+  rebuildErrorMessage(): string {
+    const error = this.facade.rebuildError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.rebuildStatus() === 'invalidState') {
+      return 'Laravel rechazó la reconstrucción porque el juego no está en un estado válido para esta herramienta técnica.';
+    }
+
+    if (this.facade.rebuildStatus() === 'conflict') {
+      return 'Laravel detectó una inconsistencia de integridad al reconstruir counters. Refresca el contexto antes de volver a intentarlo.';
+    }
+
+    return error.message;
+  }
+
   private loadFromRoute(routeGameId: string, queryGameId: string): void {
     const resolvedGameId = routeGameId || queryGameId;
 
@@ -992,6 +1170,7 @@ export class GameEnginePage {
     this.showPauseConfirmation.set(false);
     this.showResumeConfirmation.set(false);
     this.showDrawConfirmation.set(false);
+    this.showRebuildConfirmation.set(false);
     this.facade.load(resolvedGameId, routeGameId !== '' ? 'contextual' : 'manual');
   }
 

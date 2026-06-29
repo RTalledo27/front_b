@@ -9,6 +9,7 @@ import {
   GameEngineDrawCommandView,
   GameEngineDrawView,
   GameEnginePauseCommandView,
+  GameEngineRebuildCountersCommandView,
   GameEngineResumeCommandView,
   GameEngineStartCommandView,
   GameEngineWinnerView,
@@ -70,6 +71,16 @@ export function mapGameEngineDrawCommandResponse(response: unknown): GameEngineD
   }
 
   return mapGameEngineDrawCommand(response.data);
+}
+
+export function mapGameEngineRebuildCountersResponse(
+  response: unknown,
+): GameEngineRebuildCountersCommandView {
+  if (!isDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return mapGameEngineRebuildCounters(response.data);
 }
 
 export function isGameEngineInvalidPayloadError(error: unknown): boolean {
@@ -204,6 +215,27 @@ function mapGameEngineDrawCommand(payload: unknown): GameEngineDrawCommandView {
   };
 }
 
+function mapGameEngineRebuildCounters(payload: unknown): GameEngineRebuildCountersCommandView {
+  const record = readRecord(payload);
+  const outcome = readString(record['outcome']);
+
+  if (outcome !== 'rebuilt' && outcome !== 'already_consistent') {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return {
+    gameId: readString(record['game_id']),
+    outcome,
+    previousRows: readNonNegativeNumber(record['previous_rows']),
+    previousHitsTotal: readNonNegativeNumber(record['previous_hits_total']),
+    rebuiltRows: readNonNegativeNumber(record['rebuilt_rows']),
+    rebuiltHitsTotal: readNonNegativeNumber(record['rebuilt_hits_total']),
+    totalDraws: readNonNegativeNumber(record['total_draws']),
+    maxSequence: readNonNegativeNumber(record['max_sequence']),
+    rebuiltAt: readIsoDate(record['rebuilt_at']),
+  };
+}
+
 function isDataResponse(value: unknown): value is LaravelDataResponse<unknown> {
   return isRecord(value) && 'data' in value;
 }
@@ -244,6 +276,16 @@ function readPositiveNumber(value: unknown): number {
   const number = readNumber(value);
 
   if (number < 1) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return number;
+}
+
+function readNonNegativeNumber(value: unknown): number {
+  const number = readNumber(value);
+
+  if (number < 0) {
     throw new Error(INVALID_PAYLOAD_ERROR);
   }
 

@@ -71,6 +71,18 @@ export interface GameEngineDrawCommandView {
   replay: boolean;
 }
 
+export interface GameEngineRebuildCountersCommandView {
+  gameId: string;
+  outcome: 'rebuilt' | 'already_consistent';
+  previousRows: number;
+  previousHitsTotal: number;
+  rebuiltRows: number;
+  rebuiltHitsTotal: number;
+  totalDraws: number;
+  maxSequence: number;
+  rebuiltAt: string;
+}
+
 export interface GameEngineConsoleView {
   context: AdminGameDetailView;
   draws: GameEngineDrawView[];
@@ -96,6 +108,7 @@ export type GameEngineStartStatus = GameEngineCommandStatus;
 export type GameEnginePauseStatus = GameEngineCommandStatus;
 export type GameEngineResumeStatus = GameEngineCommandStatus;
 export type GameEngineDrawStatus = GameEngineCommandStatus;
+export type GameEngineRebuildStatus = GameEngineCommandStatus;
 
 export type GameEnginePageStatus =
   | 'idle'

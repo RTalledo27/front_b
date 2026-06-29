@@ -3,7 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/api/api.config';
-import { GameEngineDrawCommandView } from '../models/game-engine.models';
+import {
+  GameEngineDrawCommandView,
+  GameEngineRebuildCountersCommandView,
+} from '../models/game-engine.models';
 import { HttpGameEngineRepository } from './game-engine.repository';
 
 describe('HttpGameEngineRepository', () => {
@@ -41,6 +44,10 @@ describe('HttpGameEngineRepository', () => {
     commandId = '11111111-1111-4111-8111-111111111111',
   ): Observable<GameEngineDrawCommandView> {
     return repository.drawNumber('game-1', commandId);
+  }
+
+  function invokeRebuild(): Observable<GameEngineRebuildCountersCommandView> {
+    return repository.rebuildCounters('game-1');
   }
 
   it('requests the admin draws endpoint with paginated read params', () => {
@@ -408,6 +415,83 @@ describe('HttpGameEngineRepository', () => {
     });
 
     const request = http.expectOne('/api/v1/admin/games/game-1/draws');
+    request.error(new ProgressEvent('error'));
+  });
+
+  it('posts the rebuild command without a request body payload', () => {
+    invokeRebuild().subscribe((result) => {
+      expect(result.outcome).toBe('rebuilt');
+      expect(result.rebuiltRows).toBe(3);
+    });
+
+    const request = http.expectOne('/api/v1/admin/games/game-1/counters/rebuild');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush({
+      data: {
+        game_id: 'game-1',
+        outcome: 'rebuilt',
+        previous_rows: 1,
+        previous_hits_total: 2,
+        rebuilt_rows: 3,
+        rebuilt_hits_total: 7,
+        total_draws: 7,
+        max_sequence: 7,
+        rebuilt_at: '2026-06-27T12:20:00Z',
+      },
+    });
+  });
+
+  it('unwraps an already_consistent rebuild response as a successful command response', () => {
+    invokeRebuild().subscribe((result) => {
+      expect(result.outcome).toBe('already_consistent');
+      expect(result.rebuiltRows).toBe(0);
+    });
+
+    const request = http.expectOne('/api/v1/admin/games/game-1/counters/rebuild');
+    expect(request.request.method).toBe('POST');
+    request.flush({
+      data: {
+        game_id: 'game-1',
+        outcome: 'already_consistent',
+        previous_rows: 0,
+        previous_hits_total: 0,
+        rebuilt_rows: 0,
+        rebuilt_hits_total: 0,
+        total_draws: 0,
+        max_sequence: 0,
+        rebuilt_at: '2026-06-27T12:20:00Z',
+      },
+    });
+  });
+
+  for (const status of [401, 403, 404, 409, 422] as const) {
+    it(`surfaces a ${status} rebuild rejection unchanged`, () => {
+      invokeRebuild().subscribe({
+        next: () => {
+          throw new Error('expected the request to fail');
+        },
+        error: (error: { status: number }) => {
+          expect(error.status).toBe(status);
+        },
+      });
+
+      const request = http.expectOne('/api/v1/admin/games/game-1/counters/rebuild');
+      request.flush({ message: `rebuild_${status}` }, { status, statusText: 'Error' });
+    });
+  }
+
+  it('surfaces a network failure for rebuild unchanged', () => {
+    invokeRebuild().subscribe({
+      next: () => {
+        throw new Error('expected the request to fail');
+      },
+      error: (error: { status: number }) => {
+        expect(error.status).toBe(0);
+      },
+    });
+
+    const request = http.expectOne('/api/v1/admin/games/game-1/counters/rebuild');
     request.error(new ProgressEvent('error'));
   });
 });
