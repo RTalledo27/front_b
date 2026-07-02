@@ -4,6 +4,7 @@ import {
   LaravelPaginationMeta,
 } from '../../../core/api/models/api-response.models';
 import {
+  AdminGameCommandResultView,
   AdminGameCommerceView,
   AdminGameDetailView,
   AdminGameListResult,
@@ -44,6 +45,20 @@ export function mapAdminGameDetailResponse(response: unknown): AdminGameDetailVi
   }
 
   return mapAdminGameDetail(response.data);
+}
+
+export function mapAdminGameCommandResultResponse(response: unknown): AdminGameCommandResultView {
+  if (!isLaravelDataResponse(response)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  const resource = mapAdminGameCommandResult(response.data);
+  const record = readRecord(response);
+
+  return {
+    ...resource,
+    outcome: readNullableOutcome(record['status']),
+  };
 }
 
 export function mapAdminGameSummary(payload: unknown): AdminGameSummaryView {
@@ -90,6 +105,27 @@ export function mapAdminGameDetail(payload: unknown): AdminGameDetailView {
     projection: mapProjection(record['projection']),
     createdBy: readNullableNumber(record['created_by']),
     createdAt: readString(record['created_at']),
+  };
+}
+
+export function mapAdminGameCommandResult(payload: unknown): AdminGameCommandResultView {
+  const record = readRecord(payload);
+
+  return {
+    id: readString(record['id']),
+    slug: readString(record['slug']),
+    name: readString(record['name']),
+    description: readNullableString(record['description']),
+    status: buildAdminGameStatus(readString(record['status'])),
+    numberRange: mapNumberRange(record['number_range']),
+    ticketPrice: mapMoney(record['ticket_price']),
+    prize: mapMoney(record['prize']),
+    schedule: mapSchedule(record['schedule']),
+    settings: record['settings'] ?? null,
+    createdBy: readNullableNumber(record['created_by']),
+    createdAt: readString(record['created_at']),
+    updatedAt: readNullableIsoDate(record['updated_at']),
+    outcome: null,
   };
 }
 
@@ -286,6 +322,14 @@ function readString(value: unknown): string {
 
 function readNullableString(value: unknown): string | null {
   if (value === null) {
+    return null;
+  }
+
+  return readString(value);
+}
+
+function readNullableOutcome(value: unknown): string | null {
+  if (value === null || value === undefined) {
     return null;
   }
 

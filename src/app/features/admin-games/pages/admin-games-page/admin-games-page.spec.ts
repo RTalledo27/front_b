@@ -8,6 +8,8 @@ import { AdminGamesPage } from './admin-games-page';
 function createFacadeMock() {
   return {
     load: vi.fn(),
+    createGame: vi.fn(),
+    clearCreateFeedback: vi.fn(),
     games: signal([
       {
         id: 'game-1',
@@ -45,6 +47,14 @@ function createFacadeMock() {
       'idle' | 'loading' | 'refreshing' | 'loaded' | 'empty' | 'unauthorized' | 'forbidden' | 'validationError' | 'networkError' | 'unexpectedError'
     >('loaded'),
     error: signal<{ message: string; fieldErrors?: Record<string, string[]> } | null>(null),
+    createState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
     query: signal({
       page: 2,
       search: 'fortuna',
@@ -119,6 +129,34 @@ describe('AdminGamesPage', () => {
     expect(detailLink?.getAttribute('href')).toContain('/admin/bingos/game-1');
   });
 
+  it('shows the create button and submits the real create form payload', async () => {
+    const { fixture, facade } = await createComponent();
+    const buttons = [...fixture.nativeElement.querySelectorAll('button')] as HTMLButtonElement[];
+    const createButton = buttons.find((button) => button.textContent?.includes('Crear bingo')) as HTMLButtonElement;
+
+    createButton.click();
+    fixture.detectChanges();
+
+    const slugInput = fixture.nativeElement.querySelector('input[formcontrolname="slug"]') as HTMLInputElement;
+    const nameInput = fixture.nativeElement.querySelector('input[formcontrolname="name"]') as HTMLInputElement;
+    slugInput.value = 'bingo-nuevo';
+    slugInput.dispatchEvent(new Event('input'));
+    nameInput.value = 'Bingo Nuevo';
+    nameInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const form = fixture.nativeElement.querySelector('#admin-game-create-panel form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+
+    expect(facade.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: 'bingo-nuevo',
+        name: 'Bingo Nuevo',
+        currency: 'PEN',
+      }),
+    );
+  });
+
   it('applies filters through route query params and resets page to 1', async () => {
     const { fixture } = await createComponent();
     const router = TestBed.inject(Router);
@@ -171,5 +209,21 @@ describe('AdminGamesPage', () => {
     expect(text).toContain('Corrige los filtros');
     expect(text).toContain('The selected status is invalid.');
     expect(text).not.toContain('Sin resultados');
+  });
+
+  it('keeps validation visible when the create form is invalid', async () => {
+    const { fixture } = await createComponent();
+    const createButton = [...fixture.nativeElement.querySelectorAll('button')].find((button: HTMLButtonElement) =>
+      button.textContent?.includes('Crear bingo'),
+    ) as HTMLButtonElement;
+
+    createButton.click();
+    fixture.detectChanges();
+
+    const form = fixture.nativeElement.querySelector('#admin-game-create-panel form') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Este campo es obligatorio');
   });
 });

@@ -1,15 +1,29 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import { formatGameDate, formatMoney } from '../../../public-games/utils/public-game-display';
 import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
+import {
+  AdminGameCommandState,
+  AdminGameDetailView,
+  AdminGameLifecycleAction,
+} from '../../models/admin-games.models';
 import { formatAdminBoolean } from '../../utils/admin-games-display';
 
 @Component({
   selector: 'app-admin-game-detail-page',
-  imports: [RouterLink, StatusBadge, AdminGameNumbersPanel],
+  imports: [ReactiveFormsModule, RouterLink, StatusBadge, AdminGameNumbersPanel],
   providers: [AdminGameDetailFacade],
   template: `
     <section class="page admin-game-detail-page">
@@ -108,6 +122,131 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
             </dl>
           </section>
 
+          <section class="surface-card panel panel--wide lifecycle-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Lifecycle administrativo</p>
+                <h2>Operaciones disponibles</h2>
+                <p>El backend sigue siendo la autoridad final sobre transiciones válidas.</p>
+              </div>
+            </div>
+
+            <div class="lifecycle-actions">
+              @if (canPublish(game)) {
+                <button class="button" type="button" (click)="openAction('publish', $event)">Publicar</button>
+              }
+              @if (canOpenSales(game)) {
+                <button class="button" type="button" (click)="openAction('openSales', $event)">Abrir ventas</button>
+              }
+              @if (canCloseSales(game)) {
+                <button class="button" type="button" (click)="openAction('closeSales', $event)">Cerrar ventas</button>
+              }
+              @if (canSchedule(game)) {
+                <button class="button" type="button" (click)="openAction('schedule', $event)">Programar</button>
+              }
+              @if (canCancel(game)) {
+                <button class="button button--danger" type="button" (click)="openAction('cancel', $event)">
+                  Cancelar
+                </button>
+              }
+            </div>
+
+            @if (availableActionCount(game) === 0) {
+              <p class="panel-note">
+                No hay acciones de este bloque disponibles para el estado actual. El motor técnico permanece aparte.
+              </p>
+            }
+
+            @if (activeAction(); as action) {
+              <section
+                #confirmationPanel
+                class="confirmation-panel"
+                tabindex="-1"
+                role="dialog"
+                aria-modal="false"
+                aria-labelledby="lifecycle-confirmation-title"
+                (keydown.escape)="closeAction()"
+              >
+                <div class="confirmation-panel__header">
+                  <div>
+                    <p class="eyebrow">Confirmación</p>
+                    <h3 id="lifecycle-confirmation-title">{{ actionTitle(action) }}</h3>
+                  </div>
+                  <button class="button button--secondary" type="button" (click)="closeAction()">Cerrar</button>
+                </div>
+
+                <p>{{ actionDescription(action) }}</p>
+
+                @if (action === 'schedule') {
+                  <form class="confirmation-form" [formGroup]="scheduleForm" (ngSubmit)="confirmAction(action)">
+                    <label>
+                      Fecha y hora de inicio
+                      <input formControlName="scheduledStartAt" type="datetime-local" />
+                      @if (showScheduleFieldError()) {
+                        <span class="field-error">{{ firstScheduleFieldError() }}</span>
+                      }
+                    </label>
+                    <div class="confirmation-actions">
+                      <button
+                        class="button"
+                        type="submit"
+                        [disabled]="actionState(action).status === 'submitting'"
+                      >
+                        {{ actionState(action).status === 'submitting' ? 'Programando…' : 'Confirmar programación' }}
+                      </button>
+                      <button class="button button--secondary" type="button" (click)="closeAction()">Cancelar</button>
+                    </div>
+                  </form>
+                } @else if (action === 'cancel') {
+                  <form class="confirmation-form" [formGroup]="cancelForm" (ngSubmit)="confirmAction(action)">
+                    <label>
+                      Motivo de cancelación
+                      <textarea formControlName="reason" rows="4"></textarea>
+                      @if (showCancelFieldError()) {
+                        <span class="field-error">{{ firstCancelFieldError() }}</span>
+                      }
+                    </label>
+                    <div class="confirmation-actions">
+                      <button
+                        class="button button--danger"
+                        type="submit"
+                        [disabled]="actionState(action).status === 'submitting'"
+                      >
+                        {{ actionState(action).status === 'submitting' ? 'Cancelando…' : 'Confirmar cancelación' }}
+                      </button>
+                      <button class="button button--secondary" type="button" (click)="closeAction()">Volver</button>
+                    </div>
+                  </form>
+                } @else {
+                  <div class="confirmation-actions">
+                    <button
+                      class="button"
+                      type="button"
+                      [disabled]="actionState(action).status === 'submitting'"
+                      (click)="confirmAction(action)"
+                    >
+                      {{ submitLabel(action, actionState(action).status) }}
+                    </button>
+                    <button class="button button--secondary" type="button" (click)="closeAction()">Cancelar</button>
+                  </div>
+                }
+
+                <div class="feedback-block" aria-live="polite" aria-atomic="true">
+                  @if (actionState(action).status === 'success') {
+                    <p class="feedback-line feedback-line--success">
+                      Acción aplicada con estado backend {{ actionState(action).result?.status?.label }}.
+                    </p>
+                    @if (actionState(action).refreshState === 'failed') {
+                      <p class="feedback-line feedback-line--warning">{{ actionState(action).refreshMessage }}</p>
+                    }
+                  } @else if (actionState(action).status !== 'idle' && actionState(action).status !== 'submitting') {
+                    <p class="feedback-line feedback-line--danger">{{ actionState(action).errorMessage }}</p>
+                  }
+                </div>
+              </section>
+            }
+          </section>
+
           <section class="surface-card panel panel--wide">
             <h2>Capacidad actual</h2>
             <dl class="facts facts--numbers">
@@ -116,9 +255,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
               <div><dt>Reservados</dt><dd>{{ game.numbers.reserved }}</dd></div>
               <div><dt>Vendidos</dt><dd>{{ game.numbers.sold }}</dd></div>
             </dl>
-            <p class="panel-note">
-              Este detalle queda listo como contexto para futuros bloques de números o motor, sin activar todavía mutaciones.
-            </p>
+            <p class="panel-note">El motor técnico y el detalle de números siguen en secciones independientes.</p>
           </section>
 
           <section class="surface-card panel panel--wide">
@@ -168,6 +305,16 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     .panel--wide {
       grid-column: 1 / -1;
     }
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--s3);
+      align-items: flex-start;
+    }
+    .panel-heading p {
+      margin: 0;
+      color: var(--color-text-muted);
+    }
     .facts {
       display: grid;
       gap: var(--s3);
@@ -206,6 +353,76 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       margin: var(--s4) 0 0;
       color: var(--color-text-muted);
     }
+    .lifecycle-actions,
+    .confirmation-actions {
+      display: flex;
+      gap: var(--s3);
+      flex-wrap: wrap;
+      margin-top: var(--s4);
+    }
+    .confirmation-panel {
+      margin-top: var(--s4);
+      padding: var(--s4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-lg);
+      background: var(--color-surface-subtle);
+      outline: none;
+    }
+    .confirmation-panel__header {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--s3);
+      align-items: flex-start;
+    }
+    .confirmation-form {
+      display: grid;
+      gap: var(--s3);
+      margin-top: var(--s4);
+    }
+    label {
+      display: grid;
+      gap: .35rem;
+      font-size: var(--sm);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+    input, textarea {
+      width: 100%;
+      min-height: 2.75rem;
+      padding: 0 .75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      font: inherit;
+      background: var(--color-surface);
+    }
+    textarea {
+      min-height: 7rem;
+      padding: .75rem;
+      resize: vertical;
+    }
+    .field-error {
+      color: var(--danger-700);
+      font-size: var(--xs);
+      font-weight: 700;
+    }
+    .feedback-block {
+      min-height: 1.5rem;
+      margin-top: var(--s3);
+    }
+    .feedback-line {
+      margin: 0;
+      color: var(--color-text-muted);
+      font-size: var(--sm);
+    }
+    .feedback-line--danger {
+      color: var(--danger-700);
+    }
+    .feedback-line--success {
+      color: var(--success-700);
+    }
+    .feedback-line--warning {
+      color: var(--warning-700);
+    }
     pre {
       overflow: auto;
       padding: var(--s4);
@@ -222,11 +439,15 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       .header-actions {
         justify-items: start;
       }
-      .facts div {
+      .facts div, .panel-heading, .confirmation-panel__header {
         flex-direction: column;
       }
       dd {
         text-align: left;
+      }
+      .lifecycle-actions .button,
+      .confirmation-actions .button {
+        width: 100%;
       }
     }
   `,
@@ -235,12 +456,24 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
 export class AdminGameDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly fb = inject(FormBuilder);
 
   readonly facade = inject(AdminGameDetailFacade);
   readonly money = formatMoney;
   readonly date = formatGameDate;
   readonly yesNo = formatAdminBoolean;
+  readonly activeAction = signal<AdminGameLifecycleAction | null>(null);
+  readonly scheduleSubmitted = signal(false);
+  readonly cancelSubmitted = signal(false);
+  readonly confirmationPanel = viewChild<ElementRef<HTMLElement>>('confirmationPanel');
+  readonly scheduleForm = this.fb.nonNullable.group({
+    scheduledStartAt: ['', [Validators.required]],
+  });
+  readonly cancelForm = this.fb.nonNullable.group({
+    reason: ['', [Validators.maxLength(500)]],
+  });
   backQueryParams: Params = {};
+  private lastActionTrigger: HTMLElement | null = null;
 
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
@@ -250,12 +483,225 @@ export class AdminGameDetailPage {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const gameId = params.get('gameId') ?? '';
       if (gameId.trim() !== '') {
+        this.closeAction();
         this.facade.load(gameId);
       }
     });
   }
 
+  canPublish(game: AdminGameDetailView): boolean {
+    return game.status.value === 'draft';
+  }
+
+  canOpenSales(game: AdminGameDetailView): boolean {
+    return game.status.value === 'published';
+  }
+
+  canCloseSales(game: AdminGameDetailView): boolean {
+    return game.status.value === 'sales_open';
+  }
+
+  canSchedule(game: AdminGameDetailView): boolean {
+    return ['published', 'sales_open', 'sales_closed'].includes(game.status.value);
+  }
+
+  canCancel(game: AdminGameDetailView): boolean {
+    return ['draft', 'published', 'sales_open', 'sales_closed', 'paused'].includes(game.status.value);
+  }
+
+  availableActionCount(game: AdminGameDetailView): number {
+    return [
+      this.canPublish(game),
+      this.canOpenSales(game),
+      this.canCloseSales(game),
+      this.canSchedule(game),
+      this.canCancel(game),
+    ].filter(Boolean).length;
+  }
+
+  openAction(action: AdminGameLifecycleAction, event: Event): void {
+    this.activeAction.set(action);
+    this.lastActionTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    this.facade.clearActionFeedback(action);
+    this.scheduleSubmitted.set(false);
+    this.cancelSubmitted.set(false);
+
+    if (action === 'schedule') {
+      this.scheduleForm.reset({
+        scheduledStartAt: toDateTimeLocalValue(this.facade.game()?.schedule.scheduledStartAt),
+      });
+    }
+
+    if (action === 'cancel') {
+      this.cancelForm.reset({ reason: '' });
+    }
+
+    queueMicrotask(() => this.confirmationPanel()?.nativeElement.focus());
+  }
+
+  closeAction(): void {
+    const action = this.activeAction();
+    if (action !== null) {
+      this.facade.clearActionFeedback(action);
+    }
+
+    this.activeAction.set(null);
+    this.scheduleSubmitted.set(false);
+    this.cancelSubmitted.set(false);
+    this.lastActionTrigger?.focus();
+  }
+
+  confirmAction(action: AdminGameLifecycleAction): void {
+    switch (action) {
+      case 'publish':
+        this.facade.publish();
+        return;
+      case 'openSales':
+        this.facade.openSales();
+        return;
+      case 'closeSales':
+        this.facade.closeSales();
+        return;
+      case 'schedule':
+        this.scheduleSubmitted.set(true);
+        if (this.scheduleForm.invalid) {
+          this.scheduleForm.markAllAsTouched();
+          return;
+        }
+        this.facade.schedule({
+          scheduledStartAt: new Date(this.scheduleForm.getRawValue().scheduledStartAt).toISOString(),
+        });
+        return;
+      case 'cancel':
+        this.cancelSubmitted.set(true);
+        if (this.cancelForm.invalid) {
+          this.cancelForm.markAllAsTouched();
+          return;
+        }
+        this.facade.cancel({
+          reason: normalizeOptionalText(this.cancelForm.getRawValue().reason),
+        });
+    }
+  }
+
+  actionState(action: AdminGameLifecycleAction): AdminGameCommandState {
+    switch (action) {
+      case 'publish':
+        return this.facade.publishState();
+      case 'openSales':
+        return this.facade.openSalesState();
+      case 'closeSales':
+        return this.facade.closeSalesState();
+      case 'schedule':
+        return this.facade.scheduleState();
+      case 'cancel':
+        return this.facade.cancelState();
+    }
+  }
+
+  actionTitle(action: AdminGameLifecycleAction): string {
+    switch (action) {
+      case 'publish':
+        return 'Confirmar publicación';
+      case 'openSales':
+        return 'Confirmar apertura de ventas';
+      case 'closeSales':
+        return 'Confirmar cierre de ventas';
+      case 'schedule':
+        return 'Confirmar programación';
+      case 'cancel':
+        return 'Confirmar cancelación';
+    }
+  }
+
+  actionDescription(action: AdminGameLifecycleAction): string {
+    switch (action) {
+      case 'publish':
+        return 'Esta acción expone el bingo al flujo administrativo publicado según el backend.';
+      case 'openSales':
+        return 'Las ventas pasarán al estado abierto si el backend confirma la transición.';
+      case 'closeSales':
+        return 'El backend cerrará ventas y fijará el corte operativo del juego.';
+      case 'schedule':
+        return 'La fecha se enviará en formato ISO derivado de tu zona horaria local.';
+      case 'cancel':
+        return 'La cancelación solo debe ejecutarse sobre juegos seguros para descartar.';
+    }
+  }
+
+  submitLabel(action: AdminGameLifecycleAction, status: AdminGameCommandState['status']): string {
+    if (status !== 'submitting') {
+      switch (action) {
+        case 'publish':
+          return 'Confirmar publicación';
+        case 'openSales':
+          return 'Confirmar apertura';
+        case 'closeSales':
+          return 'Confirmar cierre';
+        case 'schedule':
+          return 'Confirmar programación';
+        case 'cancel':
+          return 'Confirmar cancelación';
+      }
+    }
+
+    switch (action) {
+      case 'publish':
+        return 'Publicando…';
+      case 'openSales':
+        return 'Abriendo ventas…';
+      case 'closeSales':
+        return 'Cerrando ventas…';
+      case 'schedule':
+        return 'Programando…';
+      case 'cancel':
+        return 'Cancelando…';
+    }
+  }
+
+  showScheduleFieldError(): boolean {
+    return this.firstScheduleFieldError() !== null;
+  }
+
+  firstScheduleFieldError(): string | null {
+    const control = this.scheduleForm.controls.scheduledStartAt;
+    if (this.scheduleSubmitted() && control.invalid) {
+      return 'Selecciona una fecha de inicio.';
+    }
+
+    return this.facade.scheduleState().fieldErrors['scheduled_start_at']?.[0] ?? null;
+  }
+
+  showCancelFieldError(): boolean {
+    return this.firstCancelFieldError() !== null;
+  }
+
+  firstCancelFieldError(): string | null {
+    const control = this.cancelForm.controls.reason;
+    if (this.cancelSubmitted() && control.errors?.['maxlength']) {
+      return 'El motivo no puede exceder 500 caracteres.';
+    }
+
+    return this.facade.cancelState().fieldErrors['reason']?.[0] ?? null;
+  }
+
   formatSettings(settings: unknown): string {
     return JSON.stringify(settings ?? null, null, 2);
   }
+}
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function toDateTimeLocalValue(value: string | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60_000);
+  return localDate.toISOString().slice(0, 16);
 }

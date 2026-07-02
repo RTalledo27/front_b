@@ -190,6 +190,48 @@ export interface AdminGameDetailView {
   createdAt: string;
 }
 
+export interface CreateAdminGamePayload {
+  slug: string;
+  name: string;
+  description: string | null;
+  numberMin: number;
+  numberMax: number;
+  hitsRequired: number;
+  ticketPriceCents: number;
+  prizeCents: number;
+  currency: string;
+  drawIntervalSeconds: number;
+  autoDrawEnabled: boolean;
+  salesOpensAt: string | null;
+  salesClosesAt: string | null;
+  scheduledStartAt: string | null;
+}
+
+export interface ScheduleGamePayload {
+  scheduledStartAt: string;
+}
+
+export interface CancelGamePayload {
+  reason: string | null;
+}
+
+export interface AdminGameCommandResultView {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  status: AdminGameStatusView;
+  numberRange: AdminGameNumberRangeView;
+  ticketPrice: AdminMoneyView;
+  prize: AdminMoneyView;
+  schedule: AdminGameScheduleView;
+  settings: unknown;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string | null;
+  outcome: string | null;
+}
+
 export interface AdminGameNumbersQuery {}
 
 export interface AdminGameNumberReservationView {
@@ -251,3 +293,32 @@ export type AdminGameNumbersStatus =
   | 'validationError'
   | 'networkError'
   | 'unexpectedError';
+
+export type AdminGameCommandStatus =
+  | 'idle'
+  | 'submitting'
+  | 'success'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'notFound'
+  | 'validationError'
+  | 'invalidState'
+  | 'conflict'
+  | 'networkError'
+  | 'unexpectedError';
+
+export type AdminGameLifecycleAction =
+  | 'publish'
+  | 'openSales'
+  | 'closeSales'
+  | 'schedule'
+  | 'cancel';
+
+export interface AdminGameCommandState {
+  status: AdminGameCommandStatus;
+  errorMessage: string | null;
+  fieldErrors: Record<string, string[]>;
+  result: AdminGameCommandResultView | null;
+  refreshState: 'idle' | 'refreshing' | 'confirmed' | 'failed';
+  refreshMessage: string | null;
+}

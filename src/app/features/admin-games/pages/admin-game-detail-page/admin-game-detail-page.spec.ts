@@ -18,6 +18,12 @@ function createFacadeMock() {
   return {
     load: vi.fn(),
     retry: vi.fn(),
+    publish: vi.fn(),
+    openSales: vi.fn(),
+    closeSales: vi.fn(),
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    clearActionFeedback: vi.fn(),
     game: signal({
       id: 'game-1',
       slug: 'bingo-fortuna',
@@ -74,6 +80,46 @@ function createFacadeMock() {
       'idle' | 'loading' | 'loaded' | 'unauthorized' | 'forbidden' | 'notFound' | 'networkError' | 'unexpectedError'
     >('loaded'),
     error: signal<{ message: string } | null>(null),
+    publishState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
+    openSalesState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
+    closeSalesState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
+    scheduleState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
+    cancelState: signal({
+      status: 'idle',
+      errorMessage: null,
+      fieldErrors: {},
+      result: null,
+      refreshState: 'idle',
+      refreshMessage: null,
+    }),
   };
 }
 
@@ -124,7 +170,7 @@ describe('AdminGameDetailPage', () => {
     expect(html.querySelector('a.button--secondary')?.getAttribute('href')).toContain(
       '/admin/bingos/game-1/motor',
     );
-    expect(text).not.toContain('Publicar');
+    expect(text).toContain('Publicar');
     expect(text).not.toContain('Abrir ventas');
   });
 
@@ -146,5 +192,42 @@ describe('AdminGameDetailPage', () => {
     fixture.detectChanges();
 
     expect(facade.load).toHaveBeenLastCalledWith('game-2');
+  });
+
+  it('shows lifecycle actions according to the current status and confirms publish', async () => {
+    const { fixture, facade } = await createComponent();
+    const publishButton = [...fixture.nativeElement.querySelectorAll('button')].find((button: HTMLButtonElement) =>
+      button.textContent?.includes('Publicar'),
+    ) as HTMLButtonElement;
+
+    publishButton.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Confirmar publicación');
+
+    const confirmButton = [...fixture.nativeElement.querySelectorAll('.confirmation-actions .button')].find(
+      (button: HTMLButtonElement) => button.textContent?.includes('Confirmar publicación'),
+    ) as HTMLButtonElement;
+    confirmButton.click();
+
+    expect(facade.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the schedule form only for schedulable states', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      status: { value: 'sales_open', label: 'Ventas abiertas', tone: 'success', isKnown: true },
+    });
+
+    const { fixture } = await createComponent(facade);
+    const scheduleButton = [...fixture.nativeElement.querySelectorAll('button')].find((button: HTMLButtonElement) =>
+      button.textContent?.includes('Programar'),
+    ) as HTMLButtonElement;
+
+    scheduleButton.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('input[formcontrolname="scheduledStartAt"]')).not.toBeNull();
   });
 });

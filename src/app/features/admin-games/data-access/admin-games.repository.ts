@@ -4,19 +4,33 @@ import { map, Observable } from 'rxjs';
 import { API_BASE_URL } from '../../../core/api/api.config';
 import { LaravelDataResponse, LaravelPaginatedResponse } from '../../../core/api/models/api-response.models';
 import {
+  AdminGameCommandResultView,
   AdminGameDetailView,
+  CancelGamePayload,
+  CreateAdminGamePayload,
   AdminGameNumbersQuery,
   AdminGameNumbersResult,
   AdminGameListQuery,
   AdminGameListResult,
+  ScheduleGamePayload,
 } from '../models/admin-games.models';
 import { mapAdminGameNumbersResponse } from './admin-game-numbers.mapper';
-import { mapAdminGameDetailResponse, mapAdminGameListResponse } from './admin-games.mapper';
+import {
+  mapAdminGameCommandResultResponse,
+  mapAdminGameDetailResponse,
+  mapAdminGameListResponse,
+} from './admin-games.mapper';
 
 export interface AdminGamesRepository {
   listGames(query: AdminGameListQuery): Observable<AdminGameListResult>;
   getGame(gameId: string): Observable<AdminGameDetailView>;
   listGameNumbers(gameId: string, query: AdminGameNumbersQuery): Observable<AdminGameNumbersResult>;
+  createGame(payload: CreateAdminGamePayload): Observable<AdminGameCommandResultView>;
+  publishGame(gameId: string): Observable<AdminGameCommandResultView>;
+  openGameSales(gameId: string): Observable<AdminGameCommandResultView>;
+  closeGameSales(gameId: string): Observable<AdminGameCommandResultView>;
+  scheduleGame(gameId: string, payload: ScheduleGamePayload): Observable<AdminGameCommandResultView>;
+  cancelGame(gameId: string, payload: CancelGamePayload): Observable<AdminGameCommandResultView>;
 }
 
 export const ADMIN_GAMES_REPOSITORY = new InjectionToken<AdminGamesRepository>(
@@ -72,5 +86,69 @@ export class HttpAdminGamesRepository implements AdminGamesRepository {
     return this.http
       .get<{ data: unknown[] }>(`${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/numbers`)
       .pipe(map(mapAdminGameNumbersResponse));
+  }
+
+  createGame(payload: CreateAdminGamePayload): Observable<AdminGameCommandResultView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(`${this.baseUrl}/admin/games`, {
+        slug: payload.slug,
+        name: payload.name,
+        description: payload.description,
+        number_min: payload.numberMin,
+        number_max: payload.numberMax,
+        hits_required: payload.hitsRequired,
+        ticket_price_cents: payload.ticketPriceCents,
+        prize_cents: payload.prizeCents,
+        currency: payload.currency,
+        draw_interval_seconds: payload.drawIntervalSeconds,
+        auto_draw_enabled: payload.autoDrawEnabled,
+        sales_opens_at: payload.salesOpensAt,
+        sales_closes_at: payload.salesClosesAt,
+        scheduled_start_at: payload.scheduledStartAt,
+      })
+      .pipe(map(mapAdminGameCommandResultResponse));
+  }
+
+  publishGame(gameId: string): Observable<AdminGameCommandResultView> {
+    return this.postLifecycleCommand(gameId, 'publish');
+  }
+
+  openGameSales(gameId: string): Observable<AdminGameCommandResultView> {
+    return this.postLifecycleCommand(gameId, 'open-sales');
+  }
+
+  closeGameSales(gameId: string): Observable<AdminGameCommandResultView> {
+    return this.postLifecycleCommand(gameId, 'close-sales');
+  }
+
+  scheduleGame(gameId: string, payload: ScheduleGamePayload): Observable<AdminGameCommandResultView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/schedule`,
+        {
+          scheduled_start_at: payload.scheduledStartAt,
+        },
+      )
+      .pipe(map(mapAdminGameCommandResultResponse));
+  }
+
+  cancelGame(gameId: string, payload: CancelGamePayload): Observable<AdminGameCommandResultView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/cancel`,
+        {
+          reason: payload.reason,
+        },
+      )
+      .pipe(map(mapAdminGameCommandResultResponse));
+  }
+
+  private postLifecycleCommand(gameId: string, path: string): Observable<AdminGameCommandResultView> {
+    return this.http
+      .post<LaravelDataResponse<unknown>>(
+        `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/${path}`,
+        {},
+      )
+      .pipe(map(mapAdminGameCommandResultResponse));
   }
 }

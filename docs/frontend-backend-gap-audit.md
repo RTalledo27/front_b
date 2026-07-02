@@ -220,6 +220,10 @@ La estrategia recomendada es dejar de abrir microbloques inconexos y pasar a blo
 
 `Bloque 1 — Admin lifecycle de bingos`
 
+Documentación de cierre del bloque:
+
+- `docs/frontend-admin-games-lifecycle.md`
+
 ### Por qué primero
 
 - Es el hueco funcional más visible entre backend y frontend actual.

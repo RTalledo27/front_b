@@ -1,17 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import { formatGameDate, formatMoney } from '../../../public-games/utils/public-game-display';
-import {
-  AdminGameSummaryView,
-  AdminGameListQuery,
-} from '../../models/admin-games.models';
-import {
-  AdminGamesFacade,
-  initialAdminGameListQuery,
-} from '../../data-access/admin-games.facade';
+import { AdminGamesFacade, initialAdminGameListQuery } from '../../data-access/admin-games.facade';
+import { AdminGameListQuery } from '../../models/admin-games.models';
 import { formatAdminBoolean } from '../../utils/admin-games-display';
 
 @Component({
@@ -24,9 +18,183 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
         <div>
           <p class="eyebrow">Administración</p>
           <h1>Bingos</h1>
-          <p>Consulta el catálogo administrativo real de juegos, sus estados y su contexto operativo.</p>
+          <p>Opera el lifecycle administrativo real de los bingos sin mezclarlo con el motor técnico.</p>
         </div>
+        <button
+          class="button"
+          type="button"
+          [attr.aria-expanded]="showCreateForm()"
+          aria-controls="admin-game-create-panel"
+          (click)="toggleCreateForm()"
+        >
+          {{ showCreateForm() ? 'Ocultar formulario' : 'Crear bingo' }}
+        </button>
       </header>
+
+      @if (showCreateForm()) {
+        <section
+          id="admin-game-create-panel"
+          class="surface-card create-card"
+          aria-labelledby="admin-game-create-title"
+        >
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">POST /api/v1/admin/games</p>
+              <h2 id="admin-game-create-title">Crear bingo</h2>
+              <p>El formulario replica únicamente campos reales del contrato backend.</p>
+            </div>
+            <button class="button button--secondary" type="button" (click)="closeCreateForm()">
+              Cerrar
+            </button>
+          </div>
+
+          <form class="create-grid" [formGroup]="createForm" (ngSubmit)="submitCreate()">
+            <label>
+              Slug
+              <input formControlName="slug" type="text" autocomplete="off" />
+              @if (showCreateFieldError('slug')) {
+                <span class="field-error">{{ firstCreateFieldError('slug') }}</span>
+              }
+            </label>
+
+            <label>
+              Nombre
+              <input formControlName="name" type="text" autocomplete="off" />
+              @if (showCreateFieldError('name')) {
+                <span class="field-error">{{ firstCreateFieldError('name') }}</span>
+              }
+            </label>
+
+            <label class="create-grid__wide">
+              Descripción
+              <textarea formControlName="description" rows="3"></textarea>
+              @if (showCreateFieldError('description')) {
+                <span class="field-error">{{ firstCreateFieldError('description') }}</span>
+              }
+            </label>
+
+            <label>
+              Número mínimo
+              <input formControlName="numberMin" type="number" inputmode="numeric" min="1" />
+              @if (showCreateFieldError('numberMin') || showCreateFieldError('number_min')) {
+                <span class="field-error">{{ firstCreateFieldError('numberMin', 'number_min') }}</span>
+              }
+            </label>
+
+            <label>
+              Número máximo
+              <input formControlName="numberMax" type="number" inputmode="numeric" min="2" />
+              @if (showCreateFieldError('numberMax') || showCreateFieldError('number_max')) {
+                <span class="field-error">{{ firstCreateFieldError('numberMax', 'number_max') }}</span>
+              }
+            </label>
+
+            <label>
+              Aciertos requeridos
+              <input formControlName="hitsRequired" type="number" inputmode="numeric" min="2" />
+              @if (showCreateFieldError('hitsRequired') || showCreateFieldError('hits_required')) {
+                <span class="field-error">{{ firstCreateFieldError('hitsRequired', 'hits_required') }}</span>
+              }
+            </label>
+
+            <label>
+              Precio por número (centavos)
+              <input formControlName="ticketPriceCents" type="number" inputmode="numeric" min="0" />
+              @if (showCreateFieldError('ticketPriceCents') || showCreateFieldError('ticket_price_cents')) {
+                <span class="field-error">
+                  {{ firstCreateFieldError('ticketPriceCents', 'ticket_price_cents') }}
+                </span>
+              }
+            </label>
+
+            <label>
+              Premio (centavos)
+              <input formControlName="prizeCents" type="number" inputmode="numeric" min="0" />
+              @if (showCreateFieldError('prizeCents') || showCreateFieldError('prize_cents')) {
+                <span class="field-error">{{ firstCreateFieldError('prizeCents', 'prize_cents') }}</span>
+              }
+            </label>
+
+            <label>
+              Moneda
+              <input formControlName="currency" type="text" maxlength="3" autocomplete="off" />
+              @if (showCreateFieldError('currency')) {
+                <span class="field-error">{{ firstCreateFieldError('currency') }}</span>
+              }
+            </label>
+
+            <label>
+              Intervalo de sorteo (s)
+              <input formControlName="drawIntervalSeconds" type="number" inputmode="numeric" min="1" />
+              @if (showCreateFieldError('drawIntervalSeconds') || showCreateFieldError('draw_interval_seconds')) {
+                <span class="field-error">
+                  {{ firstCreateFieldError('drawIntervalSeconds', 'draw_interval_seconds') }}
+                </span>
+              }
+            </label>
+
+            <label class="checkbox-field">
+              <input formControlName="autoDrawEnabled" type="checkbox" />
+              <span>Activar sorteo automático</span>
+            </label>
+
+            <label>
+              Ventas abren
+              <input formControlName="salesOpensAt" type="datetime-local" />
+              @if (showCreateFieldError('salesOpensAt') || showCreateFieldError('sales_opens_at')) {
+                <span class="field-error">{{ firstCreateFieldError('salesOpensAt', 'sales_opens_at') }}</span>
+              }
+            </label>
+
+            <label>
+              Ventas cierran
+              <input formControlName="salesClosesAt" type="datetime-local" />
+              @if (showCreateFieldError('salesClosesAt') || showCreateFieldError('sales_closes_at')) {
+                <span class="field-error">{{ firstCreateFieldError('salesClosesAt', 'sales_closes_at') }}</span>
+              }
+            </label>
+
+            <label>
+              Inicio programado
+              <input formControlName="scheduledStartAt" type="datetime-local" />
+              @if (showCreateFieldError('scheduledStartAt') || showCreateFieldError('scheduled_start_at')) {
+                <span class="field-error">
+                  {{ firstCreateFieldError('scheduledStartAt', 'scheduled_start_at') }}
+                </span>
+              }
+            </label>
+
+            <div class="create-grid__wide create-actions">
+              <button class="button" type="submit" [disabled]="facade.createState().status === 'submitting'">
+                {{ facade.createState().status === 'submitting' ? 'Creando…' : 'Crear bingo' }}
+              </button>
+              <button class="button button--secondary" type="button" (click)="clearCreateForm()">
+                Limpiar formulario
+              </button>
+            </div>
+          </form>
+
+          <div class="feedback-block" aria-live="polite" aria-atomic="true">
+            @if (facade.createState().status === 'success') {
+              <p class="feedback-line feedback-line--success">
+                Bingo creado con UUID {{ facade.createState().result?.id }}.
+              </p>
+              @if (facade.createState().refreshState === 'failed') {
+                <p class="feedback-line feedback-line--warning">{{ facade.createState().refreshMessage }}</p>
+              }
+              <a
+                class="button button--secondary"
+                [routerLink]="['/admin/bingos', facade.createState().result?.id]"
+                [queryParams]="currentQueryParams"
+              >
+                Abrir detalle del bingo creado
+              </a>
+            } @else if (facade.createState().status !== 'idle' && facade.createState().status !== 'submitting') {
+              <p class="feedback-line feedback-line--danger">{{ facade.createState().errorMessage }}</p>
+            }
+          </div>
+        </section>
+      }
 
       <section class="surface-card filters-card" aria-labelledby="admin-games-filters-title">
         <div class="filters-heading">
@@ -175,7 +343,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
               </dl>
 
               <div class="game-card__footer">
-                <p>Este juego ya queda disponible como contexto real para bloques posteriores.</p>
+                <p>El detalle conserva el lifecycle administrativo separado del motor técnico.</p>
                 <a
                   class="button button--secondary"
                   [routerLink]="['/admin/bingos', game.id]"
@@ -214,28 +382,36 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
   `,
   styles: `
     .admin-games-page { display: grid; gap: var(--s5); }
-    .filters-card, .game-card { padding: var(--s5); }
-    .filters-heading, .game-card__header, .game-card__footer {
+    .filters-card, .game-card, .create-card { padding: var(--s5); }
+    .panel-heading, .filters-heading, .game-card__header, .game-card__footer, .page-header {
       display: flex;
       gap: var(--s4);
       justify-content: space-between;
       align-items: flex-start;
     }
-    .filters-heading p, .description, .filters-summary, .game-card__footer p {
+    .panel-heading p, .filters-heading p, .description, .filters-summary, .game-card__footer p {
       margin: 0;
       color: var(--color-text-muted);
+    }
+    .create-grid, .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s3);
+      margin-top: var(--s4);
+    }
+    .create-grid__wide {
+      grid-column: 1 / -1;
+    }
+    .create-actions {
+      display: flex;
+      gap: var(--s3);
+      flex-wrap: wrap;
     }
     .filters-actions {
       display: flex;
       gap: var(--s3);
       flex-wrap: wrap;
       justify-content: flex-end;
-    }
-    .filters-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--s3);
-      margin-top: var(--s4);
     }
     label {
       display: grid;
@@ -244,7 +420,14 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       font-weight: 700;
       color: var(--color-text);
     }
-    input, select {
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      padding-top: 1.8rem;
+      font-weight: 700;
+    }
+    input, select, textarea {
       width: 100%;
       min-height: 2.75rem;
       padding: 0 .75rem;
@@ -253,11 +436,26 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       font: inherit;
       background: var(--color-surface);
     }
+    textarea {
+      min-height: 7rem;
+      padding: .75rem;
+      resize: vertical;
+    }
+    .checkbox-field input {
+      width: auto;
+      min-height: auto;
+      margin: 0;
+    }
+    .field-error {
+      color: var(--danger-700);
+      font-size: var(--xs);
+      font-weight: 700;
+    }
     .filters-summary {
       margin-top: var(--s4);
       font-size: var(--sm);
     }
-    .feedback {
+    .feedback, .feedback-block {
       min-height: 1.5rem;
     }
     .feedback-line {
@@ -266,7 +464,13 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       font-size: var(--sm);
     }
     .feedback-line--danger {
-      color: var(--danger-600);
+      color: var(--danger-700);
+    }
+    .feedback-line--success {
+      color: var(--success-700);
+    }
+    .feedback-line--warning {
+      color: var(--warning-700);
     }
     .results {
       display: grid;
@@ -308,20 +512,22 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       gap: var(--s4);
     }
     @media (max-width: 64rem) {
-      .filters-grid, .game-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .create-grid, .filters-grid, .game-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     @media (max-width: 42rem) {
-      .filters-heading, .game-card__header, .game-card__footer {
+      .page-header, .panel-heading, .filters-heading, .game-card__header, .game-card__footer {
         flex-direction: column;
       }
-      .filters-actions, .pagination {
+      .filters-actions, .create-actions, .pagination {
         width: 100%;
         justify-content: stretch;
       }
-      .filters-actions .button, .pagination .button, .game-card__footer .button {
+      .filters-actions .button, .create-actions .button, .pagination .button, .game-card__footer .button {
         width: 100%;
       }
-      .filters-grid, .game-facts {
+      .create-grid, .filters-grid, .game-facts {
         grid-template-columns: 1fr;
       }
     }
@@ -338,6 +544,8 @@ export class AdminGamesPage {
   readonly money = formatMoney;
   readonly date = formatGameDate;
   readonly yesNo = formatAdminBoolean;
+  readonly showCreateForm = signal(false);
+  readonly createSubmitted = signal(false);
   readonly statusOptions = [
     { value: 'draft', label: 'Borrador' },
     { value: 'published', label: 'Publicado' },
@@ -357,6 +565,23 @@ export class AdminGamesPage {
     createdFrom: [''],
     createdTo: [''],
   });
+  readonly createForm = this.fb.nonNullable.group({
+    slug: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(120), Validators.pattern(/^[a-z0-9-]+$/)]],
+    name: ['', [Validators.required, Validators.maxLength(160)]],
+    description: ['', [Validators.maxLength(5000)]],
+    numberMin: [1, [Validators.required, Validators.min(1)]],
+    numberMax: [90, [Validators.required, Validators.min(2)]],
+    hitsRequired: [5, [Validators.required, Validators.min(2)]],
+    ticketPriceCents: [500, [Validators.required, Validators.min(0)]],
+    prizeCents: [100000, [Validators.required, Validators.min(0)]],
+    currency: ['PEN', [Validators.required, Validators.pattern(/^[A-Za-z]{3}$/)]],
+    drawIntervalSeconds: [30, [Validators.required, Validators.min(1)]],
+    autoDrawEnabled: [false],
+    salesOpensAt: [''],
+    salesClosesAt: [''],
+    scheduledStartAt: [''],
+  });
+  readonly createFieldErrors = computed(() => this.facade.createState().fieldErrors);
 
   currentQueryParams: Params = {};
 
@@ -377,6 +602,87 @@ export class AdminGamesPage {
       );
       this.facade.load(query);
     });
+  }
+
+  toggleCreateForm(): void {
+    this.showCreateForm.update((value) => !value);
+    if (!this.showCreateForm()) {
+      this.facade.clearCreateFeedback();
+    }
+  }
+
+  closeCreateForm(): void {
+    this.showCreateForm.set(false);
+    this.facade.clearCreateFeedback();
+  }
+
+  clearCreateForm(): void {
+    this.createSubmitted.set(false);
+    this.createForm.reset({
+      slug: '',
+      name: '',
+      description: '',
+      numberMin: 1,
+      numberMax: 90,
+      hitsRequired: 5,
+      ticketPriceCents: 500,
+      prizeCents: 100000,
+      currency: 'PEN',
+      drawIntervalSeconds: 30,
+      autoDrawEnabled: false,
+      salesOpensAt: '',
+      salesClosesAt: '',
+      scheduledStartAt: '',
+    });
+    this.facade.clearCreateFeedback();
+  }
+
+  submitCreate(): void {
+    this.createSubmitted.set(true);
+    this.facade.clearCreateFeedback();
+
+    if (this.createForm.invalid) {
+      this.createForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.createForm.getRawValue();
+    this.facade.createGame({
+      slug: value.slug.trim(),
+      name: value.name.trim(),
+      description: normalizeOptionalText(value.description),
+      numberMin: value.numberMin,
+      numberMax: value.numberMax,
+      hitsRequired: value.hitsRequired,
+      ticketPriceCents: value.ticketPriceCents,
+      prizeCents: value.prizeCents,
+      currency: value.currency.trim().toUpperCase(),
+      drawIntervalSeconds: value.drawIntervalSeconds,
+      autoDrawEnabled: value.autoDrawEnabled,
+      salesOpensAt: toIsoDateTimeOrNull(value.salesOpensAt),
+      salesClosesAt: toIsoDateTimeOrNull(value.salesClosesAt),
+      scheduledStartAt: toIsoDateTimeOrNull(value.scheduledStartAt),
+    });
+  }
+
+  showCreateFieldError(...keys: string[]): boolean {
+    return this.firstCreateFieldError(...keys) !== null;
+  }
+
+  firstCreateFieldError(...keys: string[]): string | null {
+    for (const key of keys) {
+      const control = this.createForm.get(key);
+      if (control && this.createSubmitted() && control.invalid) {
+        return resolveCreateValidationMessage(key, control.errors);
+      }
+
+      const backendMessage = this.createFieldErrors()[key]?.[0] ?? null;
+      if (backendMessage !== null) {
+        return backendMessage;
+      }
+    }
+
+    return null;
   }
 
   applyFilters(): void {
@@ -508,4 +814,50 @@ function normalizeDateQueryParam(value: string | null): string | null {
   }
 
   return value;
+}
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function toIsoDateTimeOrNull(value: string): string | null {
+  if (value.trim() === '') {
+    return null;
+  }
+
+  return new Date(value).toISOString();
+}
+
+function resolveCreateValidationMessage(
+  key: string,
+  errors: Record<string, unknown> | null | undefined,
+): string | null {
+  if (errors?.['required']) {
+    return 'Este campo es obligatorio.';
+  }
+
+  if (errors?.['minlength']) {
+    return 'El valor es demasiado corto.';
+  }
+
+  if (errors?.['maxlength']) {
+    return key === 'name' ? 'El nombre excede el máximo permitido.' : 'El valor excede el máximo permitido.';
+  }
+
+  if (errors?.['pattern']) {
+    if (key === 'slug') {
+      return 'Usa solo minúsculas, números y guiones.';
+    }
+
+    if (key === 'currency') {
+      return 'Usa exactamente tres letras.';
+    }
+  }
+
+  if (errors?.['min']) {
+    return 'El valor debe respetar el mínimo permitido.';
+  }
+
+  return null;
 }

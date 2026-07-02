@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   isAdminGamesInvalidPayloadError,
+  mapAdminGameCommandResult,
+  mapAdminGameCommandResultResponse,
   mapAdminGameDetail,
   mapAdminGameListResponse,
   mapAdminGameSummary,
@@ -138,6 +140,63 @@ describe('admin-games mappers', () => {
     expect(detail.projection.distinctDrawnNumbers).toBe(6);
   });
 
+  it('maps a valid command resource without inventing detail-only fields', () => {
+    const result = mapAdminGameCommandResult({
+      id: 'game-9',
+      slug: 'nuevo-bingo',
+      name: 'Nuevo Bingo',
+      description: null,
+      status: 'published',
+      number_range: { min: 1, max: 90, hits_required: 5 },
+      ticket_price: { amount_cents: 500, currency: 'PEN' },
+      prize: { amount_cents: 100000, currency: 'PEN' },
+      schedule: {
+        sales_opens_at: null,
+        sales_closes_at: null,
+        scheduled_start_at: '2026-07-02T12:00:00Z',
+        draw_interval_seconds: 30,
+        auto_draw_enabled: false,
+      },
+      settings: { mode: 'safe' },
+      created_by: 7,
+      created_at: '2026-07-02T09:00:00Z',
+      updated_at: '2026-07-02T09:30:00Z',
+    });
+
+    expect(result.status.label).toBe('Publicado');
+    expect(result.updatedAt).toBe('2026-07-02T09:30:00Z');
+    expect(result.outcome).toBeNull();
+  });
+
+  it('maps the command response envelope outcome when present', () => {
+    const result = mapAdminGameCommandResultResponse({
+      data: {
+        id: 'game-10',
+        slug: 'nuevo',
+        name: 'Nuevo',
+        description: null,
+        status: 'draft',
+        number_range: { min: 1, max: 20, hits_required: 3 },
+        ticket_price: { amount_cents: 100, currency: 'PEN' },
+        prize: { amount_cents: 1000, currency: 'PEN' },
+        schedule: {
+          sales_opens_at: null,
+          sales_closes_at: null,
+          scheduled_start_at: null,
+          draw_interval_seconds: 10,
+          auto_draw_enabled: true,
+        },
+        settings: null,
+        created_by: 1,
+        created_at: '2026-07-02T09:00:00Z',
+        updated_at: '2026-07-02T09:00:00Z',
+      },
+      status: 'created',
+    });
+
+    expect(result.outcome).toBe('created');
+  });
+
   it('maps the paginated list envelope with real links and metadata', () => {
     const response = mapAdminGameListResponse({
       data: [
@@ -219,6 +278,15 @@ describe('admin-games mappers', () => {
         ops: { draws_total: 0, orders_pending: 0, payments_under_review: 0, entries_confirmed: 0 },
         created_by: null,
         created_at: '2026-06-25T09:00:00Z',
+      }),
+    ).toThrowError(/invalid_admin_games_payload/);
+  });
+
+  it('rejects incomplete command payloads safely', () => {
+    expect(() =>
+      mapAdminGameCommandResult({
+        id: 'broken-command',
+        slug: 'broken-command',
       }),
     ).toThrowError(/invalid_admin_games_payload/);
   });
