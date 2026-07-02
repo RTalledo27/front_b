@@ -1,10 +1,11 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ApiError, toApiError } from '../../../core/api/models/api-error.models';
+import { ApiError } from '../../../core/api/models/api-error.models';
 import { PageInfo } from '../../public-games/models/public-game.models';
-import { mapPlayerOrderSummary } from './player-commerce.mapper';
+import { map } from 'rxjs';
 import { PlayerCommerceViewStatus, PlayerOrderSummary } from '../models/player-commerce-view.models';
 import { PLAYER_COMMERCE_REPOSITORY } from './player-commerce.repository';
+import { mapPlayerOrdersResponse, resolvePlayerCommerceError } from './player-commerce.mapper';
 
 const initialPage: PageInfo = { currentPage: 1, lastPage: 1, perPage: 20, total: 0 };
 @Injectable()
@@ -21,14 +22,17 @@ export class PlayerOrdersFacade {
 
   load(page = 1, status = this.filter()): void {
     this.status.set('loading'); this.error.set(null); this.filter.set(status);
-    this.repository.listOrders(page, status || undefined).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (response) => {
-        this.orders.set(response.data.map(mapPlayerOrderSummary));
-        this.pageInfo.set({ currentPage: response.meta.current_page, lastPage: response.meta.last_page, perPage: response.meta.per_page, total: response.meta.total });
-        this.status.set(response.data.length ? 'loaded' : 'empty');
+    this.repository.listOrders(page, status || undefined).pipe(
+      map((response) => mapPlayerOrdersResponse(response)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (result) => {
+        this.orders.set(result.orders);
+        this.pageInfo.set(result.pageInfo);
+        this.status.set(result.orders.length ? 'loaded' : 'empty');
       },
       error: (error: unknown) => {
-        const apiError = toApiError(error);
+        const apiError = resolvePlayerCommerceError(error);
         this.orders.set([]);
         this.error.set(apiError);
         this.status.set(resolveReadStatus(apiError.status));

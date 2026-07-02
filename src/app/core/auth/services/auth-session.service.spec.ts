@@ -178,9 +178,42 @@ describe('AuthSessionService', () => {
       },
     });
 
-    await expect(loginPromise).rejects.toThrow('Invalid auth token response payload.');
+    await expect(loginPromise).rejects.toThrow('Invalid auth response payload.');
     expect(storage.read()).toBeNull();
     expect(service.status()).toBe('unknown');
+  });
+
+  it('clears invalid restored sessions instead of leaving a token loop', async () => {
+    storage.write('plain-text-token');
+
+    const resultPromise = firstValueFrom(service.ensureSession());
+    http.expectOne(`${apiBaseUrl}/auth/me`).flush({
+      data: {
+        ...userDto,
+        capabilities: { can_access_admin: true },
+      },
+    });
+
+    await expect(resultPromise).resolves.toBeNull();
+    expect(storage.read()).toBeNull();
+    expect(service.status()).toBe('anonymous');
+  });
+
+  it('does not let a late login response restore state after logout', async () => {
+    const loginPromise = firstValueFrom(
+      service.login({ email: 'admin@example.com', password: 'secret123' }),
+    );
+    const loginRequest = http.expectOne(`${apiBaseUrl}/auth/login`);
+
+    const logoutPromise = firstValueFrom(service.logout());
+    http.expectOne(`${apiBaseUrl}/auth/logout`).flush({});
+    await logoutPromise;
+
+    loginRequest.flush({ data: tokenDto });
+
+    await expect(loginPromise).rejects.toThrow('AUTH_SESSION_CHANGED_DURING_LOGIN');
+    expect(storage.read()).toBeNull();
+    expect(service.status()).toBe('anonymous');
   });
 
   it('deduplicates concurrent session restoration requests', async () => {

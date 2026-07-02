@@ -39,6 +39,10 @@ export const anonymousOnlyGuard: CanMatchFn = () => {
   const router = inject(Router);
   const redirects = inject(AuthRedirectService);
 
+  console.log("session: ", session);
+  console.log("router: ", router);
+  console.log("redirects: ", redirects);
+
   return session.ensureSession().pipe(
     map((user) => (user ? router.createUrlTree([redirects.routeForUser(user)]) : true)),
     catchError(() => of(true)),

@@ -5,16 +5,13 @@ import { toApiError } from '../../api/models/api-error.models';
 import { AuthRepository } from '../data-access/auth.repository';
 import {
   ActivateRequestPayload,
-  AuthTokenApiDto,
-  AuthTokenSession,
   AuthUser,
   LoginRequestPayload,
   RegisterRequestPayload,
   SessionStatus,
 } from '../models/auth.models';
 import { AuthTokenStorageService } from './auth-token-storage.service';
-import { isValidAuthTokenResponse } from './auth-response.utils';
-import { mapAuthTokenSession, mapAuthUser } from './auth-user.mapper';
+import { isAuthPayloadValidationError, mapAuthTokenSession, mapAuthUser } from './auth-user.mapper';
 
 @Injectable({ providedIn: 'root' })
 export class AuthSessionService {
@@ -22,6 +19,7 @@ export class AuthSessionService {
   private readonly tokens = inject(AuthTokenStorageService);
   private pendingRequest: Observable<AuthUser | null> | null = null;
   private pendingLogout: Observable<void> | null = null;
+  private sessionVersion = 0;
 
   readonly user = signal<AuthUser | null>(null);
   readonly status = signal<SessionStatus>('unknown');
@@ -49,6 +47,7 @@ export class AuthSessionService {
   }
 
   clearSession(): void {
+    this.sessionVersion += 1;
     this.user.set(null);
     this.abilities.set([]);
     this.tokens.clear();
@@ -56,20 +55,23 @@ export class AuthSessionService {
   }
 
   login(payload: LoginRequestPayload): Observable<AuthUser> {
+    const sessionVersion = this.sessionVersion;
     return this.authRepository.login(payload).pipe(
-      map((response) => this.applyTokenSession(response.data)),
+      map((response) => this.applyTokenSession(response.data, sessionVersion)),
     );
   }
 
   register(payload: RegisterRequestPayload): Observable<AuthUser> {
+    const sessionVersion = this.sessionVersion;
     return this.authRepository.register(payload).pipe(
-      map((response) => this.applyTokenSession(response.data)),
+      map((response) => this.applyTokenSession(response.data, sessionVersion)),
     );
   }
 
   activate(payload: ActivateRequestPayload): Observable<AuthUser> {
+    const sessionVersion = this.sessionVersion;
     return this.authRepository.activate(payload).pipe(
-      map((response) => this.applyTokenSession(response.data)),
+      map((response) => this.applyTokenSession(response.data, sessionVersion)),
     );
   }
 
@@ -112,7 +114,10 @@ export class AuthSessionService {
         this.status.set('authenticated');
       }),
       catchError((error: unknown) => {
-        if (error instanceof HttpErrorResponse && error.status === 401) {
+        if (
+          (error instanceof HttpErrorResponse && error.status === 401) ||
+          isAuthPayloadValidationError(error)
+        ) {
           this.clearSession();
           return of(null);
         }
@@ -129,12 +134,12 @@ export class AuthSessionService {
     return request;
   }
 
-  private applyTokenSession(dto: AuthTokenApiDto): AuthUser {
-    if (!isValidAuthTokenResponse(dto)) {
-      throw new Error('Invalid auth token response payload.');
+  private applyTokenSession(dto: unknown, expectedSessionVersion: number): AuthUser {
+    if (expectedSessionVersion !== this.sessionVersion) {
+      throw new Error('AUTH_SESSION_CHANGED_DURING_LOGIN');
     }
 
-    const session: AuthTokenSession = mapAuthTokenSession(dto);
+    const session = mapAuthTokenSession(dto);
     this.tokens.write(session.accessToken);
     this.user.set(session.user);
     this.abilities.set(session.abilities);

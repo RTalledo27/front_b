@@ -120,6 +120,21 @@ describe('PlayerOrderDetailFacade', () => {
     expect(facade.canUploadEvidence()).toBe(true);
   });
 
+  it('turns a malformed 200 detail payload into a controlled error state', async () => {
+    const { facade } = await configureFacade({
+      getOrder$: of(({ id: 'order-1', status: 'pending', items: [] } as unknown) as PlayerOrderDetailApiDto),
+    });
+
+    facade.load('order-1');
+
+    expect(facade.order()).toBeNull();
+    expect(facade.status()).toBe('unexpectedError');
+    expect(facade.error()).toMatchObject({
+      code: 'invalid_payload',
+      message: 'Recibimos una respuesta incompleta del servidor.',
+    });
+  });
+
   it('rejects unsupported files before reaching the backend', async () => {
     const { facade, repository } = await configureFacade();
     facade.load('order-1');

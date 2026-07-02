@@ -2,7 +2,7 @@ import { DestroyRef, computed, effect, inject, Injectable, signal } from '@angul
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiError, toApiError } from '../../../core/api/models/api-error.models';
 import { AuthSessionService } from '../../../core/auth/services/auth-session.service';
-import { mapPlayerOrderDetail } from './player-commerce.mapper';
+import { map } from 'rxjs';
 import { PaymentEvidenceIdempotencyService } from './payment-evidence-idempotency.service';
 import { PLAYER_COMMERCE_REPOSITORY } from './player-commerce.repository';
 import { PlayerCommerceViewStatus, PlayerOrderDetailView } from '../models/player-commerce-view.models';
@@ -13,6 +13,7 @@ import {
   PaymentEvidenceSelection,
   PaymentEvidenceSuccessView,
 } from '../models/player-payment-evidence.models';
+import { mapPlayerOrderDetail, resolvePlayerCommerceError } from './player-commerce.mapper';
 
 @Injectable()
 export class PlayerOrderDetailFacade {
@@ -229,14 +230,17 @@ export class PlayerOrderDetailFacade {
 
     this.repository
       .getOrder(orderId)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        map((order) => mapPlayerOrderDetail(order)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (order) => {
           if (!this.isLoadCurrent(sequence, orderId)) {
             return;
           }
 
-          this.order.set(mapPlayerOrderDetail(order));
+          this.order.set(order);
           this.status.set('loaded');
           this.error.set(null);
         },
@@ -249,8 +253,9 @@ export class PlayerOrderDetailFacade {
             return;
           }
 
-          this.error.set(toApiError(error));
-          this.status.set(resolveReadStatus(error));
+          const apiError = resolvePlayerCommerceError(error);
+          this.error.set(apiError);
+          this.status.set(resolveReadStatus(apiError.status));
         },
       });
   }
@@ -304,10 +309,8 @@ export class PlayerOrderDetailFacade {
   }
 }
 
-function resolveReadStatus(error: unknown): PlayerCommerceViewStatus {
-  const apiError = toApiError(error);
-
-  switch (apiError.status) {
+function resolveReadStatus(status: number): PlayerCommerceViewStatus {
+  switch (status) {
     case 401:
       return 'unauthorized';
     case 403:

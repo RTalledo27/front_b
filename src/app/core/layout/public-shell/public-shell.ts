@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AuthRedirectService } from '../../auth/services/auth-redirect.service';
+import { AuthSessionService } from '../../auth/services/auth-session.service';
 import { Brand } from '../../../shared/ui/brand/brand';
 
 @Component({
@@ -13,9 +15,19 @@ import { Brand } from '../../../shared/ui/brand/brand';
       </a>
       <nav aria-label="Navegación pública">
         <a routerLink="/bingos" routerLinkActive="active">Bingos</a>
-        <a routerLink="/login">Ingresar</a>
+        @if (showAnonymousActions()) {
+          <a routerLink="/login">Ingresar</a>
+        } @else if (isCheckingSession()) {
+          <span class="nav-status" aria-live="polite">Verificando sesión…</span>
+        }
       </nav>
-      <a class="button button--secondary access" routerLink="/login">Mi cuenta</a>
+      @if (isCheckingSession()) {
+        <span class="session-chip access" aria-live="polite">Verificando sesión…</span>
+      } @else if (accountAction(); as action) {
+        <a class="button button--secondary access" [routerLink]="action.path">{{ action.label }}</a>
+      } @else {
+        <a class="button button--secondary access" routerLink="/login">Ingresar</a>
+      }
     </header>
     <main id="public-content" tabindex="-1"><router-outlet /></main>
     <footer>
@@ -64,6 +76,21 @@ import { Brand } from '../../../shared/ui/brand/brand';
       background: var(--color-brand-subtle);
       color: var(--color-brand);
     }
+    .nav-status,
+    .session-chip {
+      color: var(--color-text-muted);
+      font-size: var(--sm);
+      font-weight: 700;
+    }
+    .session-chip {
+      display: inline-flex;
+      min-height: 2.75rem;
+      align-items: center;
+      padding: 0 0.9rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--color-surface);
+    }
     .access {
       margin-left: auto;
     }
@@ -108,4 +135,27 @@ import { Brand } from '../../../shared/ui/brand/brand';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PublicShell {}
+export class PublicShell {
+  private readonly session = inject(AuthSessionService);
+  private readonly redirects = inject(AuthRedirectService);
+
+  readonly isCheckingSession = computed(() => {
+    const status = this.session.status();
+    return status === 'unknown' || status === 'loading';
+  });
+
+  readonly showAnonymousActions = computed(() => this.session.status() === 'anonymous');
+
+  readonly accountAction = computed(() => {
+    const user = this.session.user();
+
+    if (user === null) {
+      return null;
+    }
+
+    return {
+      path: this.redirects.routeForUser(user),
+      label: user.capabilities.canAccessAdmin ? 'Panel admin' : 'Mi cuenta',
+    };
+  });
+}

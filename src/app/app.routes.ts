@@ -43,18 +43,19 @@ export const routes: Routes = [
   },
   {
     path: '',
-    canMatch: [anonymousOnlyGuard],
     loadComponent: () =>
       import('./core/layout/auth-shell/auth-shell').then(({ AuthShell }) => AuthShell),
     children: [
       {
         path: 'login',
+        canMatch: [anonymousOnlyGuard],
         title: 'Iniciar sesión | Fortuna',
         loadComponent: () =>
           import('./features/auth/pages/login-page/login-page').then(({ LoginPage }) => LoginPage),
       },
       {
         path: 'registro',
+        canMatch: [anonymousOnlyGuard],
         title: 'Crear cuenta | Fortuna',
         loadComponent: () =>
           import('./features/auth/pages/register-page/register-page').then(
@@ -63,6 +64,7 @@ export const routes: Routes = [
       },
       {
         path: 'activar',
+        canMatch: [anonymousOnlyGuard],
         title: 'Activar cuenta | Fortuna',
         loadComponent: () =>
           import('./features/auth/pages/activate-page/activate-page').then(

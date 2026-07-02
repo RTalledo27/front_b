@@ -1,7 +1,11 @@
 import {
+  isPlayerCommerceInvalidPayloadError,
+  mapPlayerEntriesResponse,
   mapPlayerEntry,
+  mapPlayerOrdersResponse,
   mapPlayerOrderDetail,
   mapPlayerOrderSummary,
+  mapPlayerReservationsResponse,
   mapPlayerReservation,
 } from './player-commerce.mapper';
 
@@ -95,5 +99,76 @@ describe('player-commerce.mapper', () => {
     expect(reservation.gameNumber.game?.slug).toBe('bingo-fortuna');
     expect(entry.gameNumber?.number).toBe(7);
     expect(entry.confirmedAt).toBe('2026-06-25T13:00:00Z');
+  });
+
+  it('maps the paginated orders response using the real Laravel meta shape', () => {
+    const result = mapPlayerOrdersResponse({
+      data: [
+        {
+          id: 'order-1',
+          game_id: 'game-1',
+          status: 'pending',
+          subtotal_cents: 1000,
+          total_cents: 1000,
+          currency: 'PEN',
+          expires_at: '2026-06-25T12:00:00Z',
+          paid_at: null,
+          cancelled_at: null,
+          expired_at: null,
+          created_at: '2026-06-25T10:00:00Z',
+          item_count: 2,
+          payment: null,
+        },
+      ],
+      links: { first: null, last: null, prev: null, next: null },
+      meta: {
+        current_page: 1,
+        from: 1,
+        last_page: 1,
+        links: [],
+        path: '/api/v1/me/orders',
+        per_page: 20,
+        to: 1,
+        total: 1,
+      },
+    });
+
+    expect(result.orders).toHaveLength(1);
+    expect(result.pageInfo.currentPage).toBe(1);
+    expect(result.pageInfo.total).toBe(1);
+  });
+
+  it('rejects incomplete list payloads safely', () => {
+    try {
+      mapPlayerOrdersResponse({
+        data: [{ id: 'order-1', status: 'pending' }],
+        meta: { current_page: 1 },
+      });
+    } catch (error) {
+      expect(isPlayerCommerceInvalidPayloadError(error)).toBe(true);
+      return;
+    }
+
+    throw new Error('Expected player commerce mapper to reject the payload');
+  });
+
+  it('rejects incomplete detail payloads safely', () => {
+    try {
+      mapPlayerOrderDetail({
+        id: 'order-1',
+        status: 'pending',
+        items: [],
+      });
+    } catch (error) {
+      expect(isPlayerCommerceInvalidPayloadError(error)).toBe(true);
+      return;
+    }
+
+    throw new Error('Expected player commerce detail mapper to reject the payload');
+  });
+
+  it('rejects invalid reservations and entries collection payloads safely', () => {
+    expect(() => mapPlayerReservationsResponse({ data: {} })).toThrow();
+    expect(() => mapPlayerEntriesResponse({ data: {} })).toThrow();
   });
 });

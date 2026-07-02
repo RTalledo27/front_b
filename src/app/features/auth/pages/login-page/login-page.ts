@@ -2,8 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
-import { ApiError, toApiError } from '../../../../core/api/models/api-error.models';
+import { EMPTY, catchError, finalize, from, map, switchMap, throwError } from 'rxjs';
+import { ApiError } from '../../../../core/api/models/api-error.models';
+import {
+  createAuthRedirectError,
+  toAuthFlowError,
+} from '../../../../core/auth/services/auth-response.utils';
 import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
 import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
 
@@ -130,18 +134,35 @@ export class LoginPage {
       return;
     }
 
+    if (this.submitting()) {
+      return;
+    }
+
     this.submitting.set(true);
     this.session
       .login(this.form.getRawValue())
       .pipe(
+        switchMap((user) =>
+          from(Promise.resolve(this.redirects.resolveReturnUrl(user, this.returnUrl))).pipe(
+            switchMap((targetUrl) => from(this.router.navigateByUrl(targetUrl))),
+            map((navigated) => {
+              if (!navigated) {
+                throw createAuthRedirectError();
+              }
+
+              return user;
+            }),
+            catchError(() => throwError(() => createAuthRedirectError())),
+          ),
+        ),
+        catchError((error: unknown) => {
+          this.submitError.set(toAuthFlowError(error));
+          return EMPTY;
+        }),
         finalize(() => this.submitting.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (user) =>
-          void this.router.navigateByUrl(this.redirects.resolveReturnUrl(user, this.returnUrl)),
-        error: (error: unknown) => this.submitError.set(toApiError(error)),
-      });
+      .subscribe();
   }
 
   checkSession(): void {
@@ -150,20 +171,33 @@ export class LoginPage {
     this.session
       .refreshSession()
       .pipe(
+        switchMap((user) => {
+          if (!user) {
+            this.sessionMessage.set('No encontramos una sesión activa en esta pestaña.');
+            return EMPTY;
+          }
+
+          return from(
+            this.router.navigateByUrl(this.redirects.resolveReturnUrl(user, this.returnUrl)),
+          ).pipe(
+            map((navigated) => {
+              if (!navigated) {
+                throw createAuthRedirectError();
+              }
+
+              return user;
+            }),
+            catchError(() => throwError(() => createAuthRedirectError())),
+          );
+        }),
+        catchError((error: unknown) => {
+          this.sessionMessage.set(toAuthFlowError(error).message);
+          return EMPTY;
+        }),
         finalize(() => this.checkingSession.set(false)),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (user) => {
-          if (!user) {
-            this.sessionMessage.set('No encontramos una sesión activa en esta pestaña.');
-            return;
-          }
-
-          void this.router.navigateByUrl(this.redirects.resolveReturnUrl(user, this.returnUrl));
-        },
-        error: (error: unknown) => this.sessionMessage.set(toApiError(error).message),
-      });
+      .subscribe();
   }
 
   private resolveFieldError(controlName: 'email' | 'password', fallback: string): string | null {

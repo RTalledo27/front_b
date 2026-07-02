@@ -1,17 +1,91 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of, Subject, throwError } from 'rxjs';
 import { App } from './app';
 import { routes } from './app.routes';
+import { AuthSessionService } from './core/auth/services/auth-session.service';
+import { AuthTokenStorageService } from './core/auth/services/auth-token-storage.service';
 
 describe('App foundation', () => {
   it('renders the application router outlet', async () => {
+    const session = {
+      ensureSession: vi.fn(() => of(null)),
+      status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('anonymous'),
+    };
+    const tokens = {
+      read: vi.fn(() => null),
+    };
+
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: session },
+        { provide: AuthTokenStorageService, useValue: tokens },
+      ],
     }).compileComponents();
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
+    expect(session.ensureSession).not.toHaveBeenCalled();
+  });
+
+  it('hydrates an existing session on startup and shows a temporary overlay', async () => {
+    const restoration = new Subject<null>();
+    const session = {
+      ensureSession: vi.fn(() => restoration.asObservable()),
+      status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('loading'),
+    };
+    const tokens = {
+      read: vi.fn(() => 'stored-token'),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: session },
+        { provide: AuthTokenStorageService, useValue: tokens },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(session.ensureSession).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).toContain('Recuperando tu sesión');
+
+    restoration.next(null);
+    restoration.complete();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Recuperando tu sesión');
+  });
+
+  it('removes the overlay even if session restoration fails', async () => {
+    const session = {
+      ensureSession: vi.fn(() => throwError(() => new Error('boom'))),
+      status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('loading'),
+    };
+    const tokens = {
+      read: vi.fn(() => 'stored-token'),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: session },
+        { provide: AuthTokenStorageService, useValue: tokens },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(session.ensureSession).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).not.toContain('Recuperando tu sesión');
   });
 
   it('opens the public catalog at the root route', () => {
@@ -44,9 +118,12 @@ describe('App foundation', () => {
     expect(player?.children?.some((route) => route.path === 'reservas')).toBe(true);
     expect(player?.children?.some((route) => route.path === 'compras')).toBe(true);
     expect(player?.children?.some((route) => route.path === 'compras/:orderId')).toBe(true);
-    expect(auth?.canMatch).toHaveLength(1);
+    expect(auth?.canMatch).toBeUndefined();
+    expect(auth?.children?.find((route) => route.path === 'login')?.canMatch).toHaveLength(1);
     expect(auth?.children?.some((route) => route.path === 'registro')).toBe(true);
+    expect(auth?.children?.find((route) => route.path === 'registro')?.canMatch).toHaveLength(1);
     expect(auth?.children?.some((route) => route.path === 'activar')).toBe(true);
+    expect(auth?.children?.find((route) => route.path === 'activar')?.canMatch).toHaveLength(1);
   });
 
   it('provides a dedicated forbidden route', () => {

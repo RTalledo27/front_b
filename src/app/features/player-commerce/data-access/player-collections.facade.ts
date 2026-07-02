@@ -1,12 +1,17 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ApiError, toApiError } from '../../../core/api/models/api-error.models';
+import { ApiError } from '../../../core/api/models/api-error.models';
+import { map } from 'rxjs';
 import {
   PlayerCommerceViewStatus,
   PlayerEntryView,
   PlayerReservationView,
 } from '../models/player-commerce-view.models';
-import { mapPlayerEntry, mapPlayerReservation } from './player-commerce.mapper';
+import {
+  mapPlayerEntriesResponse,
+  mapPlayerReservationsResponse,
+  resolvePlayerCommerceError,
+} from './player-commerce.mapper';
 import { PLAYER_COMMERCE_REPOSITORY } from './player-commerce.repository';
 
 @Injectable()
@@ -24,17 +29,20 @@ export class PlayerReservationsFacade {
 
     this.repository
       .listReservations()
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        map((response) => mapPlayerReservationsResponse(response)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
-        next: (response) => {
-          const items = response.data.map(mapPlayerReservation);
+        next: (items) => {
           this.items.set(items);
           this.status.set(items.length > 0 ? 'loaded' : 'empty');
         },
         error: (error: unknown) => {
+          const apiError = resolvePlayerCommerceError(error);
           this.items.set([]);
-          this.error.set(toApiError(error));
-          this.status.set(resolveReadStatus(error));
+          this.error.set(apiError);
+          this.status.set(resolveReadStatus(apiError.status));
         },
       });
   }
@@ -55,26 +63,27 @@ export class PlayerEntriesFacade {
 
     this.repository
       .listEntries()
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        map((response) => mapPlayerEntriesResponse(response)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
-        next: (response) => {
-          const items = response.data.map(mapPlayerEntry);
+        next: (items) => {
           this.items.set(items);
           this.status.set(items.length > 0 ? 'loaded' : 'empty');
         },
         error: (error: unknown) => {
+          const apiError = resolvePlayerCommerceError(error);
           this.items.set([]);
-          this.error.set(toApiError(error));
-          this.status.set(resolveReadStatus(error));
+          this.error.set(apiError);
+          this.status.set(resolveReadStatus(apiError.status));
         },
       });
   }
 }
 
-function resolveReadStatus(error: unknown): PlayerCommerceViewStatus {
-  const apiError = toApiError(error);
-
-  switch (apiError.status) {
+function resolveReadStatus(status: number): PlayerCommerceViewStatus {
+  switch (status) {
     case 401:
       return 'unauthorized';
     case 403:
