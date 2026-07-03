@@ -52,4 +52,143 @@ describe('HttpAdminCommerceRepository', () => {
     expect(reject.request.headers.get('Idempotency-Key')).toBe('reject-key-12345678');
     reject.flush({ data: { payment: { id: 'payment-2', status: 'rejected', reviewed_at: null }, order: { id: 'order-2', status: 'rejected' } } });
   });
+
+  it('sends refund commands with the exact backend body and idempotency key', () => {
+    let refundId = '';
+    repository.refundOrder('order-1', { reason: 'El sorteo se canceló y corresponde refund total.' }, 'refund-key-12345678')
+      .subscribe((refund) => refundId = refund.id);
+
+    const request = http.expectOne('/api/v1/admin/orders/order-1/refund');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ reason: 'El sorteo se canceló y corresponde refund total.' });
+    expect(request.request.headers.get('Idempotency-Key')).toBe('refund-key-12345678');
+    request.flush({
+      data: {
+        id: 'refund-1',
+        order_id: 'order-1',
+        payment_id: 'payment-1',
+        game_id: 'game-1',
+        amount_cents: 5000,
+        currency: 'PEN',
+        reason: 'El sorteo se canceló y corresponde refund total.',
+        processed_by_user_id: 7,
+        processed_at: '2026-07-03T13:00:00Z',
+        created_at: '2026-07-03T13:00:00Z',
+        entries: { ids: ['entry-1'], count: 1 },
+        numbers: [5],
+        game_number_ids: ['number-1'],
+        was_already_refunded: false,
+      },
+    });
+
+    expect(refundId).toBe('refund-1');
+  });
+
+  it('loads persisted refunds through the show endpoint', () => {
+    let amount = 0;
+    repository.getOrderRefund('order-1').subscribe((refund) => amount = refund.amountCents);
+
+    const request = http.expectOne('/api/v1/admin/orders/order-1/refund');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      data: {
+        id: 'refund-1',
+        order_id: 'order-1',
+        payment_id: 'payment-1',
+        game_id: 'game-1',
+        amount_cents: 5000,
+        currency: 'PEN',
+        reason: 'Refund confirmado',
+        processed_by_user_id: 7,
+        processed_at: '2026-07-03T13:00:00Z',
+        created_at: '2026-07-03T13:00:00Z',
+        entries: { ids: ['entry-1'], count: 1 },
+        numbers: [5],
+        game_number_ids: ['number-1'],
+        was_already_refunded: true,
+      },
+    });
+
+    expect(amount).toBe(5000);
+  });
+
+  it('sends winner payout as multipart form data with its idempotency key', () => {
+    const file = new File(['pdf-content'], 'comprobante.pdf', { type: 'application/pdf' });
+    let payoutId = '';
+
+    repository.processWinnerPayout('game-1', {
+      externalReference: 'OP-777',
+      notes: 'Transferencia validada',
+      document: file,
+    }, 'payout-key-12345678').subscribe((payout) => payoutId = payout.id);
+
+    const request = http.expectOne('/api/v1/admin/games/game-1/winner/payout');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('payout-key-12345678');
+    expect(request.request.body instanceof FormData).toBe(true);
+    const formData = request.request.body as FormData;
+    expect(formData.get('external_reference')).toBe('OP-777');
+    expect(formData.get('notes')).toBe('Transferencia validada');
+    expect(formData.get('document')).toBe(file);
+    request.flush({
+      data: {
+        id: 'payout-1',
+        game_id: 'game-1',
+        game_winner_id: 'winner-1',
+        user_id: 15,
+        amount_cents: 50000,
+        currency: 'PEN',
+        method: 'manual',
+        external_reference: 'OP-777',
+        notes: 'Transferencia validada',
+        processed_by_user_id: 1,
+        processed_at: '2026-07-03T13:00:00Z',
+        created_at: '2026-07-03T13:00:00Z',
+        document: {
+          id: 'doc-1',
+          original_filename: 'comprobante.pdf',
+          mime_type: 'application/pdf',
+          size_bytes: 1200,
+          created_at: '2026-07-03T13:00:00Z',
+        },
+        was_already_processed: false,
+      },
+    });
+
+    expect(payoutId).toBe('payout-1');
+  });
+
+  it('loads existing winner payout through the show endpoint', () => {
+    let reference = '';
+    repository.getWinnerPayout('game-1').subscribe((payout) => reference = payout.externalReference);
+
+    const request = http.expectOne('/api/v1/admin/games/game-1/winner/payout');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      data: {
+        id: 'payout-1',
+        game_id: 'game-1',
+        game_winner_id: 'winner-1',
+        user_id: 15,
+        amount_cents: 50000,
+        currency: 'PEN',
+        method: 'manual',
+        external_reference: 'OP-777',
+        notes: null,
+        processed_by_user_id: 1,
+        processed_at: '2026-07-03T13:00:00Z',
+        created_at: '2026-07-03T13:00:00Z',
+        document: {
+          id: 'doc-1',
+          original_filename: 'comprobante.pdf',
+          mime_type: 'application/pdf',
+          size_bytes: 1200,
+          created_at: '2026-07-03T13:00:00Z',
+        },
+        was_already_processed: true,
+      },
+    });
+
+    expect(reference).toBe('OP-777');
+  });
 });

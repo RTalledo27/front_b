@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
+import { AdminWinnerPayoutPanel } from '../../../admin-commerce/components/admin-winner-payout-panel/admin-winner-payout-panel';
 import { formatGameDate, formatMoney } from '../../../public-games/utils/public-game-display';
 import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
@@ -23,7 +24,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
 
 @Component({
   selector: 'app-admin-game-detail-page',
-  imports: [ReactiveFormsModule, RouterLink, StatusBadge, AdminGameNumbersPanel],
+  imports: [ReactiveFormsModule, RouterLink, StatusBadge, AdminGameNumbersPanel, AdminWinnerPayoutPanel],
   providers: [AdminGameDetailFacade],
   template: `
     <section class="page admin-game-detail-page">
@@ -257,6 +258,15 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
             </dl>
             <p class="panel-note">El motor técnico y el detalle de números siguen en secciones independientes.</p>
           </section>
+
+          <app-admin-winner-payout-panel
+            class="panel--wide"
+            [gameId]="game.id"
+            [gameStatus]="game.status.value"
+            [prizeAmountCents]="game.prize.amountCents"
+            [currency]="game.prize.currency"
+            [winner]="game.winner"
+          />
 
           <section class="surface-card panel panel--wide">
             <h2>Configuración técnica</h2>

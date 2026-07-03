@@ -52,6 +52,7 @@ La estrategia recomendada es dejar de abrir microbloques inconexos y pasar a blo
 - Documentación existente relevante:
   - `frontend-phase-2-*`
   - `frontend-phase-3-*`
+  - `frontend-admin-commerce-completion.md`
   - `frontend-runtime-freeze-audit.md`
   - `frontend-auth-login-freeze-audit.md`
 

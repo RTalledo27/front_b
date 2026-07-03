@@ -2,6 +2,7 @@ import { Component, input, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
+import { AdminWinnerPayoutPanel } from '../../../admin-commerce/components/admin-winner-payout-panel/admin-winner-payout-panel';
 import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
 import { AdminGameDetailPage } from './admin-game-detail-page';
@@ -12,6 +13,18 @@ import { AdminGameDetailPage } from './admin-game-detail-page';
 })
 class AdminGameNumbersPanelStub {
   readonly gameId = input.required<string>();
+}
+
+@Component({
+  selector: 'app-admin-winner-payout-panel',
+  template: '<section data-testid="winner-payout-panel">Payout administrativo</section>',
+})
+class AdminWinnerPayoutPanelStub {
+  readonly gameId = input.required<string>();
+  readonly gameStatus = input.required<string>();
+  readonly prizeAmountCents = input.required<number>();
+  readonly currency = input.required<string>();
+  readonly winner = input<unknown>(null);
 }
 
 function createFacadeMock() {
@@ -144,8 +157,8 @@ describe('AdminGameDetailPage', () => {
       ],
     })
       .overrideComponent(AdminGameDetailPage, {
-        remove: { imports: [AdminGameNumbersPanel] },
-        add: { imports: [AdminGameNumbersPanelStub] },
+        remove: { imports: [AdminGameNumbersPanel, AdminWinnerPayoutPanel] },
+        add: { imports: [AdminGameNumbersPanelStub, AdminWinnerPayoutPanelStub] },
       })
       .overrideComponent(AdminGameDetailPage, {
         set: { providers: [{ provide: AdminGameDetailFacade, useValue: facade }] },
