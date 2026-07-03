@@ -382,16 +382,29 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
   `,
   styles: `
     .admin-games-page { display: grid; gap: var(--s5); }
-    .filters-card, .game-card, .create-card { padding: var(--s5); }
+    .filters-card, .game-card, .create-card {
+      min-width: 0;
+      max-width: 100%;
+      padding: var(--s5);
+    }
     .panel-heading, .filters-heading, .game-card__header, .game-card__footer, .page-header {
       display: flex;
       gap: var(--s4);
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: flex-start;
+    }
+    .page-header > *,
+    .panel-heading > *,
+    .filters-heading > *,
+    .game-card__header > *,
+    .game-card__footer > * {
+      min-width: 0;
     }
     .panel-heading p, .filters-heading p, .description, .filters-summary, .game-card__footer p {
       margin: 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .create-grid, .filters-grid {
       display: grid;
@@ -428,7 +441,9 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       font-weight: 700;
     }
     input, select, textarea {
+      box-sizing: border-box;
       width: 100%;
+      max-width: 100%;
       min-height: 2.75rem;
       padding: 0 .75rem;
       border: 1px solid var(--color-border);
@@ -476,6 +491,16 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       display: grid;
       gap: var(--s4);
     }
+    .results > * {
+      min-width: 0;
+    }
+    .game-card__header h2,
+    .game-card__header .eyebrow,
+    .description,
+    .game-card__footer p {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .game-card__header h2 {
       margin: .2rem 0;
     }
@@ -498,6 +523,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     .game-facts dd {
       margin: .35rem 0 0;
       font-weight: 800;
+      overflow-wrap: anywhere;
       word-break: break-word;
     }
     .game-card__footer {
@@ -507,9 +533,11 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     }
     .pagination {
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
       align-items: center;
       gap: var(--s4);
+      text-align: center;
     }
     @media (max-width: 64rem) {
       .create-grid, .filters-grid, .game-facts {

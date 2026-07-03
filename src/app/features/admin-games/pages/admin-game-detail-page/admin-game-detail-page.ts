@@ -280,6 +280,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       color: var(--color-link);
       font-weight: 750;
       text-decoration: none;
+      overflow-wrap: anywhere;
     }
     .back-link:hover {
       color: var(--color-link-hover);
@@ -288,18 +289,26 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     .detail-header p {
       margin: 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .header-actions {
       display: grid;
       gap: var(--s3);
       justify-items: end;
+      min-width: 0;
     }
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--s4);
     }
+    .detail-header > *,
+    .detail-grid > * {
+      min-width: 0;
+    }
     .panel {
+      min-width: 0;
+      max-width: 100%;
       padding: var(--s5);
     }
     .panel--wide {
@@ -311,9 +320,13 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       gap: var(--s3);
       align-items: flex-start;
     }
+    .panel-heading > * {
+      min-width: 0;
+    }
     .panel-heading p {
       margin: 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .facts {
       display: grid;
@@ -343,6 +356,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       margin: 0;
       font-weight: 800;
       text-align: right;
+      overflow-wrap: anywhere;
       word-break: break-word;
     }
     .facts--numbers dd {
@@ -362,6 +376,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     }
     .confirmation-panel {
       margin-top: var(--s4);
+      min-width: 0;
       padding: var(--s4);
       border: 1px solid var(--color-border);
       border-radius: var(--r-lg);
@@ -387,7 +402,9 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       color: var(--color-text);
     }
     input, textarea {
+      box-sizing: border-box;
       width: 100%;
+      max-width: 100%;
       min-height: 2.75rem;
       padding: 0 .75rem;
       border: 1px solid var(--color-border);
@@ -424,6 +441,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       color: var(--warning-700);
     }
     pre {
+      max-width: 100%;
       overflow: auto;
       padding: var(--s4);
       border-radius: var(--r-md);

@@ -181,31 +181,99 @@ Además cada acción conserva:
   - confirmación de publish;
   - formulario de schedule.
 
-## Smoke manual
+## Smoke real local
 
-No ejecutado.
+Ejecutado el `2026-07-02` contra:
 
-Motivo:
+- frontend legacy ya levantado en `http://127.0.0.1:4200`;
+- frontend limpio de verificación en `http://localhost:4201`;
+- backend Laravel en `http://localhost:8000`;
+- PostgreSQL local del stack Docker `backend_rifas_app`.
 
-- en esta corrida no se levantaron Angular y Laravel juntos con un juego desechable confirmado;
-- por seguridad no se dispararon mutaciones reales sobre datos no verificados como descartables.
+Usuarios locales desechables usados:
 
-Smoke recomendado:
+- admin: `smoke.admin@example.com`;
+- player: `smoke.player@example.com`.
 
-1. Login admin.
-2. Abrir `/admin/bingos`.
-3. Crear un bingo desechable.
-4. Entrar al detalle.
-5. Publicar.
-6. Abrir ventas.
-7. Cerrar ventas.
-8. Programar fecha futura.
-9. Cancelar solo si sigue siendo un juego seguro para descartar.
-10. Confirmar refresh y errores de transición inválida.
+Juego desechable creado y usado en el smoke:
+
+- UUID real: `019f2372-597b-73ba-8a7a-fa55a612b54e`;
+- slug: `smoke-bingo-1783006096911`.
+
+Ejecución confirmada:
+
+1. login admin real;
+2. apertura de `/admin/bingos`;
+3. create real desde UI;
+4. apertura de detalle;
+5. `publish`;
+6. `open-sales`;
+7. `close-sales`;
+8. `schedule` con fecha futura;
+9. `cancel`;
+10. validación de acceso anónimo y de usuario `player`.
+
+Resultados confirmados:
+
+- create exitoso desde UI, con bingo persistido en backend;
+- `publish`, `open-sales`, `close-sales`, `schedule` y `cancel` devolvieron `200` y reconciliaron el estado visible;
+- el snapshot final en base de datos quedó `status=cancelled`, con `sales_opens_at`, `sales_closes_at` y `scheduled_start_at` persistidos;
+- navegación anónima a `/admin/bingos` redirige a `/login?returnUrl=%2Fadmin%2Fbingos`;
+- usuario `player` autenticado termina en `/403`.
+
+Hallazgo y hardening aplicado:
+
+- el frontend servido previamente en `4200` seguía disparando `GET /api/v1/admin/games/{gameId}/numbers` en loop;
+- se aisló el `effect()` de `AdminGameNumbersPanel` con `untracked(...)` para que dependa solo de `gameId`;
+- el build corregido levantado en `4201` confirmó una sola respuesta `200` para `/numbers` durante la carga del detalle, sin loop repetitivo.
+
+## QA visual y responsive
+
+Ronda ejecutada el `2026-07-02` sobre `http://127.0.0.1:4200` después de:
+
+- detener los `ng serve` previos que seguían sirviendo bundle viejo;
+- limpiar `.angular/cache`;
+- levantar `npm start -- --host 127.0.0.1 --port 4200`.
+
+Rutas revisadas:
+
+- admin: `/admin/bingos`, `/admin/bingos/:gameId`, `/admin/bingos/:gameId/motor`, `/admin/ordenes`, `/admin/pagos`;
+- player: `/jugador/inicio`, `/jugador/compras`, `/jugador/reservas`, `/jugador/cartones`;
+- público: `/`, `/bingos`, `/bingos/:slug`, `/bingos/:slug/numeros`.
+
+Breakpoints auditados:
+
+- `360px`;
+- `390px`;
+- `768px`;
+- `1024px`;
+- `1280px`;
+- `1440px`.
+
+Problemas observados y correcciones:
+
+- se endurecieron contenedores padre e hijos con `min-width: 0` para evitar compresiones raras en cards, paneles y shells;
+- se añadió `overflow-wrap: anywhere` y `word-break: break-word` en encabezados, slugs, UUIDs, descripciones, `dd` y feedbacks para textos largos;
+- se reforzó `box-sizing` y `max-width: 100%` en inputs y textareas para formularios admin y confirmaciones inline;
+- se forzó `flex-wrap` en encabezados, footers, paginación y grupos de acciones para que los botones no empujen el layout en móvil;
+- se mantuvo el panel de números estable y sin reload reactivo accidental.
+
+Estado confirmado:
+
+- sin overflow horizontal en las rutas auditadas;
+- layouts admin y player ocupando el ancho disponible correctamente;
+- lifecycle panel, confirmaciones inline y motor utilizables en móvil y desktop;
+- panel de números cargando una sola vez en `4200` limpio, sin loop y sin congelar el navegador;
+- sin pantallas blancas ni loaders infinitos en la verificación manual de esta ronda.
+
+Notas:
+
+- `/admin/pagos/:paymentId` no se auditó porque en esta corrida no se seleccionó un `paymentId` local seguro para mutaciones o descarga;
+- `/` resuelve hacia el catálogo público (`/bingos`) en el estado actual del frontend.
 
 ## Resultados de validación
 
-- `npm test -- --watch=false` -> `45 passed`, `400 passed`
+- `npm test -- --watch=false` -> `45 passed`, `401 passed`
 - `npm run build` -> ok
 - warning existente conservado:
   - budget SCSS en `src/app/features/game-numbers/pages/number-selection-page/number-selection-page.ts`, excedido por `535 bytes`

@@ -188,15 +188,19 @@ interface NavItem {
     header div {
       display: grid;
       flex: 1;
+      min-width: 0;
     }
     header small {
       color: var(--neutral-500);
       font-size: var(--xs);
+      overflow-wrap: anywhere;
     }
     header strong {
       font-size: var(--sm);
+      overflow-wrap: anywhere;
     }
     main {
+      min-width: 0;
       padding: clamp(1rem, 3vw, 2rem);
     }
     .backdrop {

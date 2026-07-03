@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, untracked } from '@angular/core';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import { formatGameDate } from '../../../public-games/utils/public-game-display';
 import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.facade';
@@ -117,9 +117,13 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
       gap: var(--s4);
       align-items: flex-start;
     }
+    .panel-header > * {
+      min-width: 0;
+    }
     .panel-note {
       margin: .4rem 0 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .numbers-summary p {
       margin: var(--s4) 0 0;
@@ -132,6 +136,7 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
       margin-top: var(--s4);
     }
     .number-card {
+      min-width: 0;
       padding: var(--s4);
       border: 1px solid var(--color-border);
       border-radius: var(--r-md);
@@ -144,6 +149,9 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
       justify-content: space-between;
       gap: var(--s3);
       align-items: flex-start;
+    }
+    .number-card__header > * {
+      min-width: 0;
     }
     .number-card__header h3,
     .number-card__eyebrow {
@@ -176,6 +184,7 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
       margin: 0;
       text-align: right;
       font-weight: 700;
+      overflow-wrap: anywhere;
       word-break: break-word;
     }
     @media (max-width: 64rem) {
@@ -209,12 +218,14 @@ export class AdminGameNumbersPanel {
     effect(() => {
       const currentGameId = this.gameId().trim();
 
-      if (currentGameId === '') {
-        this.facade.reset();
-        return;
-      }
+      untracked(() => {
+        if (currentGameId === '') {
+          this.facade.reset();
+          return;
+        }
 
-      this.facade.load(currentGameId);
+        this.facade.load(currentGameId);
+      });
     });
   }
 }

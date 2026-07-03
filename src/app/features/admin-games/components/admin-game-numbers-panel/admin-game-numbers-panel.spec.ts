@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { AdminGameNumbersResult } from '../../models/admin-games.models';
 import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.facade';
 import { AdminGameNumbersPanel } from './admin-game-numbers-panel';
 
@@ -8,7 +9,7 @@ function createFacadeMock() {
     load: vi.fn(),
     reload: vi.fn(),
     reset: vi.fn(),
-    numbers: signal([
+    numbers: signal<AdminGameNumbersResult['numbers']>([
       {
         id: 'number-1',
         number: 1,
@@ -67,6 +68,26 @@ describe('AdminGameNumbersPanel', () => {
     expect(text).toContain('Vendido');
     expect(text).not.toContain('Liberar');
     expect(text).not.toContain('Editar');
+  });
+
+  it('does not trigger a new load when facade signals change after the first response', async () => {
+    const { fixture, facade } = await createComponent();
+
+    expect(facade.load).toHaveBeenCalledTimes(1);
+
+    facade.numbers.set([
+      {
+        id: 'number-3',
+        number: 3,
+        status: { value: 'available', label: 'Disponible', tone: 'success', isKnown: true },
+        activeReservation: null,
+        soldEntry: null,
+      },
+    ]);
+    facade.status.set('loaded');
+    fixture.detectChanges();
+
+    expect(facade.load).toHaveBeenCalledTimes(1);
   });
 
   it('shows loading accessibly', async () => {

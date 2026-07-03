@@ -561,11 +561,14 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
     .hero,
     .panel,
     .start-panel {
+      min-width: 0;
+      max-width: 100%;
       padding: var(--s5);
     }
     .manual-form {
       display: grid;
       gap: var(--s3);
+      min-width: 0;
       max-width: 34rem;
       margin: var(--s4) 0;
     }
@@ -573,6 +576,9 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       font-weight: 700;
     }
     input {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
       min-height: 2.75rem;
       padding: 0 .75rem;
       border: 1px solid var(--color-border);
@@ -586,10 +592,14 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       justify-content: space-between;
       align-items: center;
     }
+    .context-actions > * {
+      min-width: 0;
+    }
     .back-link {
       color: var(--color-link);
       font-weight: 700;
       text-decoration: none;
+      overflow-wrap: anywhere;
     }
     .back-link:hover {
       color: var(--color-link-hover);
@@ -601,12 +611,20 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       gap: var(--s4);
       align-items: flex-start;
     }
+    .hero > *,
+    .start-panel__header > *,
+    .technical-panel__header > *,
+    .summary-grid > *,
+    .audit-grid > * {
+      min-width: 0;
+    }
     .hero h2,
     .hero p,
     .panel h3,
     .start-panel h3,
     .start-panel p {
       margin-top: 0;
+      overflow-wrap: anywhere;
     }
     .start-panel {
       display: grid;
@@ -709,11 +727,14 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       margin: 0;
       text-align: right;
       font-weight: 800;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .panel-header p,
     .empty-copy {
       margin: 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .draw-list,
     .counter-list {
