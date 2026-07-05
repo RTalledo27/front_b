@@ -197,6 +197,191 @@ Se mantuvo en verde la suite completa del frontend.
 
 No se ejecutaron mutaciones reales en datos locales porque este bloque se cerró con contratos backend confirmados, build verde y suite completa en verde, y la instrucción del bloque prohíbe acciones mutantes fuera de datos desechables explícitos.
 
+## Smoke real local
+
+- Fecha: `2026-07-04` / `2026-07-05` (America/Lima)
+- Entorno:
+  - frontend: `http://localhost:4200`
+  - backend: `http://localhost:8000`
+  - DB local: PostgreSQL en Docker (`rifas_postgres`)
+  - admin smoke: `smoke.admin@example.com`
+  - player smoke: `smoke.player@example.com`
+- Dataset desechable:
+  - refund:
+    - `order_id`: `019f2864-bbf4-7166-ae84-36996e95219c`
+    - `payment_id`: `019f2864-bc3a-722e-90ba-a56e62d5fc01`
+    - juego: `019f23c8-272e-716f-ad02-cb34ec5e1826`
+    - estado inicial: orden `paid`, pago `approved`, sin refund
+  - payout:
+    - juego principal: `fd7800f4-88f7-44d3-9ab3-8d6a1518fd95`
+    - `winner_id`: `5fa00db1-a1df-45a0-8102-4c8d7bc553b1`
+    - juego auxiliar responsive: `bd331d69-874e-4e8b-86a6-a0d5ee3f6225`
+    - estado inicial: juego `completed`, ganador real, sin payout
+
+### Bug encontrado
+
+- Los formularios de refund y payout hacÃ­an submit nativo.
+- La SPA se recargaba.
+- No se emitÃ­an los POST reales de refund/payout.
+
+### Causa raÃ­z
+
+- Se usaba `(ngSubmit)` en formularios sin `FormsModule` ni `[formGroup]` sobre el elemento `<form>`.
+- El navegador ejecutaba el submit HTML nativo en lugar del flujo Angular controlado.
+
+### Fix aplicado
+
+- Submit controlado con `preventDefault()` en:
+  - `admin-order-refund-card`
+  - `admin-winner-payout-panel`
+  - `admin-orders-page`
+  - `admin-payment-detail-page`
+- Regresiones explÃ­citas para refund y payout verificando que el submit DOM queda interceptado y no deriva en submit nativo.
+
+### Refund smoke
+
+- CancelaciÃ³n previa:
+  - se abriÃ³ el panel en `/admin/ordenes`;
+  - se cancelÃ³ sin recarga completa;
+  - no hubo persistencia (`refund_count = 0`);
+  - la URL permaneciÃ³ en `/admin/ordenes`.
+- EjecuciÃ³n real:
+  - la UI enviÃ³ el motivo `Smoke refund desde UI para orden descartable local.`;
+  - el runtime backend registrÃ³ accesos al recurso `/api/v1/admin/orders/{order}/refund`;
+  - la vista refrescÃ³ y la orden pasÃ³ a `Reembolsada`;
+  - el botÃ³n cambiÃ³ a `Ver reembolso`;
+  - el snapshot posterior mostrÃ³ monto, nÃºmeros `1, 2` y motivo persistido.
+- Estado final:
+  - orden `refunded`
+  - pago `refunded`
+  - `refund_id`: `019f3043-543a-7206-826c-bd3a38774926`
+  - procesado por `user_id = 4`
+
+### Payout smoke
+
+- ValidaciÃ³n UI tras el fix:
+  - el formulario ya no recarga la SPA al confirmar sin archivo;
+  - la URL permanece en `/admin/bingos/{gameId}`;
+  - aparece el error accesible `Adjunta la evidencia del payout.`
+- Cierre UI real:
+  - el archivo de evidencia se cargÃ³ manualmente en el navegador real;
+  - el submit se ejecutÃ³ desde `/admin/bingos/bd331d69-874e-4e8b-86a6-a0d5ee3f6225` sin recarga completa de la SPA;
+  - el botÃ³n pasÃ³ a `Registrando payoutâ€¦`;
+  - el backend registrÃ³ el acceso al recurso `/api/v1/admin/games/{game}/winner/payout`;
+  - la UI refrescÃ³ a estado `Payout registrado`.
+- VerificaciÃ³n posterior en UI:
+  - el panel final mostrÃ³ `Payout registrado`;
+  - se reflejaron referencia `SMOKE-PAYOUT-UI-MANUAL-001`, mÃ©todo `manual`, fecha procesada, `smoke-payment-evidence.pdf` y las notas persistidas.
+- Estado final:
+  - `payout_id`: `019f3059-38c3-7344-9fb3-898210bc33b1`
+  - `game_winner_id`: `fb0f1970-2306-4983-a595-4974803d3648`
+  - `document`: `smoke-payment-evidence.pdf`
+  - procesado por `user_id = 4`
+
+### AutorizaciÃ³n
+
+- Verificado por API real local:
+  - anÃ³nimo -> `GET /api/v1/auth/me` responde `401`
+  - player -> refund admin responde `403`
+  - player -> payout admin responde `403`
+
+### Idempotencia
+
+- Refund:
+  - la UI terminÃ³ mostrando snapshot persistido del refund;
+  - el backend mantuvo un solo registro terminal para la orden.
+- Payout:
+  - el POST real local se ejecutÃ³ con `Idempotency-Key`;
+  - el panel posterior reflejÃ³ un solo payout persistido para el `game_winner_id`.
+- No se imprimieron claves completas en el reporte.
+
+### Responsive
+
+- Breakpoints revisados:
+  - `360px`
+  - `390px`
+  - `768px`
+  - `1024px`
+  - `1280px`
+  - `1440px`
+- Resultado:
+  - sin overflow horizontal global en la mediciÃ³n previa del detalle admin (`360/390/768/1024/1280/1440`);
+  - el detalle admin quedÃ³ endurecido con `min-width: 0`, `overflow-wrap: anywhere` y grids `auto-fit`;
+  - el panel de payout, refund y nÃºmeros administrativos ahora ocupan mejor el ancho disponible;
+  - `ConfiguraciÃ³n tÃ©cnica` ya no muestra `null` crudo y usa un empty state honesto.
+
+## QA visual y responsive
+
+- Rutas objetivo:
+  - `/admin/bingos/:gameId`
+  - componente `Payout del ganador`
+  - secciÃ³n `ConfiguraciÃ³n tÃ©cnica`
+  - secciÃ³n `NÃºmeros administrativos`
+  - componentes de refund en `/admin/ordenes` y `/admin/pagos/:paymentId`
+- Problemas encontrados:
+  - el panel `Payout del ganador` distribuÃ­a mal las columnas y partÃ­a pobremente referencia/evidencia;
+  - `ConfiguraciÃ³n tÃ©cnica` imprimÃ­a `null` como contenido crudo;
+  - `NÃºmeros administrativos` no ocupaba todo el ancho del grid padre;
+  - el resumen de refund quedaba demasiado estrecho y con wrapping insuficiente.
+- Correcciones aplicadas:
+  - `app-admin-game-numbers-panel` ahora ocupa una columna completa del grid padre y expone host block-level;
+  - payout/refund usan grids `repeat(auto-fit, minmax(min(100%, 12rem), 1fr))` para tarjetas y resÃºmenes;
+  - textos largos y feedbacks quedaron endurecidos con `min-width: 0`, `max-width: 100%`, `overflow-wrap: anywhere` y `word-break: break-word`;
+  - `ConfiguraciÃ³n tÃ©cnica` muestra `Sin configuraciÃ³n tÃ©cnica registrada.` cuando backend devuelve `null`;
+  - el resumen de capacidad usa `auto-fit` y el detalle admin alinea mejor paneles altos.
+- ValidaciÃ³n funcional mantenida:
+  - refund sigue usando submit interceptado con `preventDefault()`;
+  - payout sigue usando submit interceptado con `preventDefault()`;
+  - la UI de payout ya cerrÃ³ en smoke real con `Payout registrado`;
+  - no se reabriÃ³ el loop de `/numbers` porque `untracked(...)` sigue presente en `AdminGameNumbersPanel`.
+
+## Validación visual final post-fix
+
+- Fecha: `2026-07-05`
+- Navegador usado: `Google Chrome` real local con perfil temporal limpio
+- Rutas revisadas:
+  - `/admin/bingos/bd331d69-874e-4e8b-86a6-a0d5ee3f6225`
+  - `/admin/bingos/fd7800f4-88f7-44d3-9ab3-8d6a1518fd95`
+  - `/admin/ordenes`
+  - `/admin/pagos`
+  - `/admin/pagos/019f2864-bc3a-722e-90ba-a56e62d5fc01`
+  - `/admin/bingos/bd331d69-874e-4e8b-86a6-a0d5ee3f6225/motor`
+- Breakpoints revisados:
+  - `360px`
+  - `390px`
+  - `768px`
+  - `1024px`
+  - `1280px`
+  - `1440px`
+- Resultado visual:
+  - sin overflow horizontal en todas las rutas auditadas;
+  - `Payout del ganador` quedó visible y estable; el detalle con payout persistido mostró `Payout registrado`;
+  - referencia, evidencia y notas quedaron contenidas sin romper layout;
+  - `Configuración técnica` ya no muestra `null` crudo y presenta `Sin configuración técnica registrada.`;
+  - `Números administrativos` ocupa correctamente el ancho del contenedor;
+  - refund card visible en `/admin/ordenes` y en `/admin/pagos/:paymentId`, sin quedar estrecha;
+  - el panel de refund se abrió sin cambiar la URL (`/admin/ordenes` se mantuvo estable);
+  - lifecycle, payout y motor permanecen separados visualmente;
+  - no hubo pantalla blanca.
+- Consola:
+  - sin errores nuevos de `console`;
+  - sin `pageerror` en la pasada final.
+- Requests:
+  - `/api/v1/admin/games/bd331d69-874e-4e8b-86a6-a0d5ee3f6225/numbers` registró una sola `GET 200` en la comprobación larga, sin loop.
+
+### Resultados finales
+
+- `npm test -- --watch=false`:
+  - `49` archivos en verde
+  - `421` tests en verde
+- `npm run build`:
+  - verde
+  - se mantiene el warning preexistente de budget SCSS en `number-selection-page`
+- `npm run lint`:
+  - no existe script `lint`
+- `git diff --check`:
+  - sin errores de diff; Git mostrÃ³ solo warnings `LF -> CRLF`
+
 ## Riesgos pendientes
 
 - el backend devuelve `400` cuando falta `Idempotency-Key`; el frontend evita ese caso, pero la UI no distingue un estado especial para `400` y lo trata como error inesperado si ocurriera por otra causa;

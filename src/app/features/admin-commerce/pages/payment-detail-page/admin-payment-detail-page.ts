@@ -126,7 +126,7 @@ import {
             @if (facade.actionError()) {
               <p class="error" role="alert">{{ facade.actionError()?.message }}</p>
             }
-            <form (ngSubmit)="approve()">
+            <form (submit)="approve($event)">
               <label>
                 Notas de aprobación (opcional)
                 <textarea [formControl]="notes" maxlength="1000" rows="3"></textarea>
@@ -135,7 +135,7 @@ import {
                 Aprobar pago
               </button>
             </form>
-            <form (ngSubmit)="reject()">
+            <form (submit)="reject($event)">
               <label>
                 Motivo del rechazo
                 <textarea [formControl]="reason" maxlength="1000" rows="3" aria-describedby="reason-help"></textarea>
@@ -306,13 +306,17 @@ export class AdminPaymentDetailPage {
     this.facade.load(this.paymentId);
   }
 
-  approve(): void {
+  approve(event?: Event): void {
+    event?.preventDefault();
+
     if (this.notes.valid) {
       this.facade.approve(this.notes.value);
     }
   }
 
-  reject(): void {
+  reject(event?: Event): void {
+    event?.preventDefault();
+
     if (this.reason.valid) {
       this.facade.reject(this.reason.value);
     }

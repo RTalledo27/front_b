@@ -243,4 +243,18 @@ describe('AdminGameDetailPage', () => {
 
     expect(fixture.nativeElement.querySelector('input[formcontrolname="scheduledStartAt"]')).not.toBeNull();
   });
+
+  it('shows an honest empty state instead of rendering raw null technical settings', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      settings: null as never,
+    });
+
+    const { fixture } = await createComponent(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Sin configuración técnica registrada.');
+    expect(fixture.nativeElement.querySelector('pre')?.textContent?.trim()).not.toBe('null');
+  });
 });

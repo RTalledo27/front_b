@@ -270,6 +270,7 @@ Notas:
 
 - `/admin/pagos/:paymentId` no se auditó porque en esta corrida no se seleccionó un `paymentId` local seguro para mutaciones o descarga;
 - `/` resuelve hacia el catálogo público (`/bingos`) en el estado actual del frontend.
+- `admin-game-detail` recibió un hardening visual adicional durante el cierre de Admin Commerce Completion para que `Payout del ganador`, `Configuración técnica` y `Números administrativos` aprovechen mejor el ancho, no muestren `null` crudo y mantengan wrapping seguro sin reabrir el loop de `/numbers`.
 
 ## Resultados de validación
 

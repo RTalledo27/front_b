@@ -50,7 +50,7 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
           }
           <p class="panel-note">La evidencia queda almacenada de forma privada en backend; esta UI no inventa descargas ni rutas públicas.</p>
         } @else if (canProcess()) {
-          <form class="payout-form" (ngSubmit)="submitPayout()">
+          <form class="payout-form" (submit)="submitPayout($event)">
             <label>
               Referencia externa
               <input [formControl]="externalReference" type="text" maxlength="500" />
@@ -101,9 +101,16 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
     </section>
   `,
   styles: `
+    :host {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
     .payout-panel {
       display: grid;
       gap: var(--s4);
+      width: 100%;
+      max-width: 100%;
     }
     .panel-heading,
     .payout-actions {
@@ -116,7 +123,7 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
     .winner-grid,
     .payout-summary {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
       gap: var(--s3);
     }
     .winner-grid > div,
@@ -126,9 +133,27 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
       display: grid;
       gap: var(--s2);
     }
+    .winner-grid > div,
+    .payout-summary > div {
+      min-width: 0;
+      padding: var(--s3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--color-surface-subtle);
+    }
     small,
     .panel-note {
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
+    }
+    strong,
+    code,
+    label,
+    p {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     input[type='text'],
     input[type='file'],
@@ -156,6 +181,9 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
     .notice--danger {
       background: #fff1f1;
     }
+    .feedback {
+      min-width: 0;
+    }
     .field-error,
     .feedback-line--danger {
       color: var(--danger-700);
@@ -171,10 +199,6 @@ import { AdminWinnerPayoutFacade } from '../../data-access/admin-commerce.facade
       overflow-wrap: anywhere;
     }
     @media (max-width: 52rem) {
-      .winner-grid,
-      .payout-summary {
-        grid-template-columns: 1fr;
-      }
       .panel-heading .button,
       .payout-actions .button {
         width: 100%;
@@ -250,7 +274,9 @@ export class AdminWinnerPayoutPanel {
     this.document.set(file);
   }
 
-  submitPayout(): void {
+  submitPayout(event?: Event): void {
+    event?.preventDefault();
+
     this.attemptedSubmit.set(true);
     this.externalReference.markAllAsTouched();
     this.notes.markAllAsTouched();

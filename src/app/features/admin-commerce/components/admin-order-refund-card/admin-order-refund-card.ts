@@ -56,7 +56,7 @@ import { AdminOrderRefundFacade } from '../../data-access/admin-commerce.facades
                 {{ refund.wasAlreadyRefunded ? 'La acción fue recuperada desde el backend como replay idempotente.' : 'El backend marcó la orden y el pago como reembolsados.' }}
               </p>
             } @else if (!refunded()) {
-              <form class="refund-form" (ngSubmit)="submitRefund()">
+              <form class="refund-form" (submit)="submitRefund($event)">
                 <label>
                   Motivo del reembolso
                   <textarea
@@ -109,12 +109,15 @@ import { AdminOrderRefundFacade } from '../../data-access/admin-commerce.facades
       display: grid;
       gap: var(--s3);
       justify-items: start;
+      min-width: 0;
     }
     .refund-panel {
-      width: min(100%, 42rem);
+      width: min(100%, 52rem);
+      max-width: 100%;
       padding: var(--s4);
       display: grid;
       gap: var(--s3);
+      min-width: 0;
     }
     .refund-panel__header,
     .refund-actions {
@@ -126,7 +129,7 @@ import { AdminOrderRefundFacade } from '../../data-access/admin-commerce.facades
     }
     .refund-summary {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
       gap: var(--s3);
     }
     .refund-summary > div,
@@ -135,10 +138,28 @@ import { AdminOrderRefundFacade } from '../../data-access/admin-commerce.facades
       display: grid;
       gap: var(--s2);
     }
+    .refund-summary > div {
+      min-width: 0;
+      padding: var(--s3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--color-surface-subtle);
+    }
     .refund-summary small,
     .hint,
     label small {
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
+    }
+    strong,
+    p,
+    label,
+    small,
+    code {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     textarea {
       box-sizing: border-box;
@@ -174,9 +195,6 @@ import { AdminOrderRefundFacade } from '../../data-access/admin-commerce.facades
       overflow-wrap: anywhere;
     }
     @media (max-width: 48rem) {
-      .refund-summary {
-        grid-template-columns: 1fr;
-      }
       .refund-actions .button,
       .refund-panel__header .button {
         width: 100%;
@@ -250,7 +268,9 @@ export class AdminOrderRefundCard {
     return 'Reembolsar orden';
   }
 
-  submitRefund(): void {
+  submitRefund(event?: Event): void {
+    event?.preventDefault();
+
     if (this.reason.invalid) {
       this.reason.markAllAsTouched();
       return;

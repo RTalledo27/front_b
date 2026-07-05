@@ -273,10 +273,14 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
             <p class="panel-note">
               Se muestra la configuración real expuesta por el backend sin reinterpretarla en el navegador.
             </p>
-            <pre>{{ formatSettings(game.settings) }}</pre>
+            @if (formatSettings(game.settings); as settingsText) {
+              <pre>{{ settingsText }}</pre>
+            } @else {
+              <p class="technical-settings-empty">Sin configuración técnica registrada.</p>
+            }
           </section>
 
-          <app-admin-game-numbers-panel [gameId]="game.id" />
+          <app-admin-game-numbers-panel class="panel--wide" [gameId]="game.id" />
         </div>
       }
     </section>
@@ -311,6 +315,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--s4);
+      align-items: start;
     }
     .detail-header > *,
     .detail-grid > * {
@@ -351,7 +356,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       border-bottom: 1px solid var(--color-border);
     }
     .facts--numbers {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
     }
     .facts--numbers div {
       display: grid;
@@ -376,6 +381,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
     .panel-note {
       margin: var(--s4) 0 0;
       color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .lifecycle-actions,
     .confirmation-actions {
@@ -440,6 +446,16 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       margin: 0;
       color: var(--color-text-muted);
       font-size: var(--sm);
+      overflow-wrap: anywhere;
+    }
+    .technical-settings-empty {
+      margin: var(--s4) 0 0;
+      padding: var(--s4);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--color-surface-subtle);
+      color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     .feedback-line--danger {
       color: var(--danger-700);
@@ -714,7 +730,11 @@ export class AdminGameDetailPage {
   }
 
   formatSettings(settings: unknown): string {
-    return JSON.stringify(settings ?? null, null, 2);
+    if (settings === null || settings === undefined) {
+      return '';
+    }
+
+    return JSON.stringify(settings, null, 2);
   }
 }
 

@@ -71,4 +71,24 @@ describe('AdminOrderRefundCard', () => {
 
     expect(facade.refundOrder).toHaveBeenCalledWith({ reason: 'Refund total por cierre definitivo.' });
   });
+
+  it('prevents native form submission when confirming a refund', async () => {
+    const { fixture, facade } = await createComponent();
+    const buttons = fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
+    buttons[0]?.click();
+    fixture.detectChanges();
+
+    const textarea = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    textarea.value = 'Smoke refund desde submit DOM.';
+    textarea.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const form = fixture.nativeElement.querySelector('form.refund-form') as HTMLFormElement;
+    const event = new Event('submit', { bubbles: true, cancelable: true });
+    form.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(facade.refundOrder).toHaveBeenCalledWith({ reason: 'Smoke refund desde submit DOM.' });
+  });
 });

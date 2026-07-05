@@ -111,6 +111,11 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
     </section>
   `,
   styles: `
+    :host {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
     .panel-header {
       display: flex;
       justify-content: space-between;
@@ -131,9 +136,11 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
     }
     .numbers-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
       gap: var(--s3);
       margin-top: var(--s4);
+      width: 100%;
+      max-width: 100%;
     }
     .number-card {
       min-width: 0;
@@ -186,11 +193,6 @@ import { AdminGameNumbersFacade } from '../../data-access/admin-game-numbers.fac
       font-weight: 700;
       overflow-wrap: anywhere;
       word-break: break-word;
-    }
-    @media (max-width: 64rem) {
-      .numbers-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
     }
     @media (max-width: 42rem) {
       .panel-header,

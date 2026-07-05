@@ -77,4 +77,30 @@ describe('AdminWinnerPayoutPanel', () => {
       document: file,
     });
   });
+
+  it('prevents native form submission when confirming payout', async () => {
+    const { fixture, facade } = await createComponent();
+    const file = new File(['pdf'], 'comprobante.pdf', { type: 'application/pdf' });
+    const inputs = fixture.nativeElement.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>;
+    const notes = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+
+    inputs[0]!.value = 'OP-778';
+    inputs[0]!.dispatchEvent(new Event('input'));
+    notes.value = 'Smoke payout desde submit DOM.';
+    notes.dispatchEvent(new Event('input'));
+    fixture.componentInstance.document.set(file);
+    fixture.detectChanges();
+
+    const form = fixture.nativeElement.querySelector('form.payout-form') as HTMLFormElement;
+    const event = new Event('submit', { bubbles: true, cancelable: true });
+    form.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(facade.processPayout).toHaveBeenCalledWith({
+      externalReference: 'OP-778',
+      notes: 'Smoke payout desde submit DOM.',
+      document: file,
+    });
+  });
 });

@@ -25,7 +25,7 @@ import {
         </div>
       </header>
 
-      <form class="toolbar surface-card" (ngSubmit)="search()">
+      <form class="toolbar surface-card" (submit)="search($event)">
         <label>
           Juego
           <input [formControl]="gameId" placeholder="UUID del juego" />
@@ -249,7 +249,8 @@ export class AdminOrdersPage {
     this.facade.load();
   }
 
-  search(): void {
+  search(event?: Event): void {
+    event?.preventDefault();
     this.facade.load(1, this.facade.statusFilter(), this.gameId.value);
   }
 
