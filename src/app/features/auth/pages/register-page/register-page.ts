@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { API_BASE_URL } from '../../../../core/api/api.config';
 import { ApiError, toApiError } from '../../../../core/api/models/api-error.models';
 import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
 import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
@@ -13,7 +14,12 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
   template: `<div class="auth-page">
     <p class="eyebrow">Cuenta nueva</p>
     <h2>Crea tu acceso de jugador</h2>
-    <p class="intro">Registrate con tu correo para comprar, revisar ordenes y seguir tus partidas.</p>
+    <p class="intro">Regístrate con tu correo para comprar, revisar órdenes y seguir tus partidas.</p>
+
+    <div class="social-actions" aria-label="Registro social">
+      <a class="button button--secondary" [href]="socialLoginUrl('google')">Continuar con Google</a>
+      <a class="button button--secondary" [href]="socialLoginUrl('facebook')">Continuar con Facebook</a>
+    </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="form-field">
@@ -32,7 +38,7 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </div>
 
       <div class="form-field">
-        <label for="email">Correo electronico</label>
+        <label for="email">Correo electrónico</label>
         <input
           id="email"
           type="email"
@@ -47,13 +53,13 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </div>
 
       <div class="form-field">
-        <label for="password">Contrasena</label>
+        <label for="password">Contraseña</label>
         <input
           id="password"
           type="password"
           formControlName="password"
           autocomplete="new-password"
-          placeholder="Crea una contrasena segura"
+          placeholder="Crea una contraseña segura"
           [attr.aria-describedby]="passwordError() ? 'password-error' : null"
         />
         @if (passwordError()) {
@@ -62,13 +68,13 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </div>
 
       <div class="form-field">
-        <label for="password_confirmation">Confirmar contrasena</label>
+        <label for="password_confirmation">Confirmar contraseña</label>
         <input
           id="password_confirmation"
           type="password"
           formControlName="password_confirmation"
           autocomplete="new-password"
-          placeholder="Repite tu contrasena"
+          placeholder="Repite tu contraseña"
           [attr.aria-describedby]="passwordConfirmationError() ? 'password-confirmation-error' : null"
         />
         @if (passwordConfirmationError()) {
@@ -81,13 +87,13 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       }
 
       <button class="button" type="submit" [disabled]="submitting()">
-        {{ submitting() ? 'Creando cuenta...' : 'Crear cuenta' }}
+        {{ submitting() ? 'Creando cuenta…' : 'Crear cuenta' }}
       </button>
     </form>
 
     <div class="links">
       <a routerLink="/login">Ya tengo cuenta</a>
-      <a routerLink="/activar">Activar invitacion</a>
+      <a routerLink="/activar">Activar invitación</a>
     </div>
   </div>`,
   styles: `
@@ -95,6 +101,12 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .auth-page { padding-block: var(--s6); }
     h2 { margin-bottom: var(--s2); font-size: var(--2xl); letter-spacing: -.03em; }
     .intro { margin-bottom: var(--s8); color: var(--neutral-600); }
+    .social-actions {
+      display: grid;
+      gap: var(--s3);
+      margin-bottom: var(--s5);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     form { display: grid; gap: var(--s5); }
     .button { width: 100%; margin-top: var(--s2); }
     .error { color: var(--danger-600); font-size: var(--xs); font-weight: 650; }
@@ -103,7 +115,10 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .links { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s5); }
     .links a { color: var(--color-link); font-size: var(--sm); font-weight: 750; text-decoration: none; }
     .links a:hover { color: var(--color-link-hover); text-decoration: underline; }
-    @media (max-width: 36rem) { .links { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 36rem) {
+      .links { align-items: flex-start; flex-direction: column; }
+      .social-actions { grid-template-columns: 1fr; }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -113,6 +128,7 @@ export class RegisterPage {
   private readonly redirects = inject(AuthRedirectService);
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly apiBaseUrl = inject(API_BASE_URL);
 
   readonly submitted = signal(false);
   readonly submitting = signal(false);
@@ -125,9 +141,9 @@ export class RegisterPage {
   });
 
   readonly nameError = () => this.resolveFieldError('name', 'Ingresa tu nombre.');
-  readonly emailError = () => this.resolveFieldError('email', 'Ingresa un correo valido.');
+  readonly emailError = () => this.resolveFieldError('email', 'Ingresa un correo válido.');
   readonly passwordError = () =>
-    this.resolveFieldError('password', 'La contrasena debe tener al menos 8 caracteres.');
+    this.resolveFieldError('password', 'La contraseña debe tener al menos 8 caracteres.');
   readonly passwordConfirmationError = () => {
     const backendError = this.submitError()?.fieldErrors['password_confirmation']?.[0] ?? null;
 
@@ -140,15 +156,19 @@ export class RegisterPage {
     }
 
     if (this.form.controls.password_confirmation.invalid) {
-      return 'Confirma tu contrasena.';
+      return 'Confirma tu contraseña.';
     }
 
     if (this.passwordsDoNotMatch()) {
-      return 'Las contrasenas no coinciden.';
+      return 'Las contraseñas no coinciden.';
     }
 
     return null;
   };
+
+  socialLoginUrl(provider: 'google' | 'facebook'): string {
+    return `${this.apiBaseUrl}/auth/social/${provider}/redirect`;
+  }
 
   submit(): void {
     this.submitted.set(true);

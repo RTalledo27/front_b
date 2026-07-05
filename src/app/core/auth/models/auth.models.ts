@@ -61,3 +61,55 @@ export interface ActivateRequestPayload {
   password: string;
   password_confirmation: string;
 }
+
+export interface ForgotPasswordRequestPayload {
+  email: string;
+}
+
+export interface ResetPasswordRequestPayload {
+  email: string;
+  token: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface SocialExchangeRequestPayload {
+  code: string;
+}
+
+export interface VerifyEmailRequestPayload {
+  id: string;
+  hash: string;
+  expires: string;
+  signature: string;
+}
+
+export interface UnlinkSocialAccountRequestPayload {
+  current_password?: string;
+}
+
+export interface AuthMessageResponseDto {
+  message: string;
+}
+
+export interface VerifyEmailResponseDto extends AuthMessageResponseDto {
+  email_verified: boolean;
+}
+
+export type SocialProvider = 'google' | 'facebook';
+
+export interface LinkedSocialAccountApiDto {
+  provider: SocialProvider;
+  provider_email_masked: string | null;
+  provider_email_verified: boolean;
+  linked_at: string | null;
+  can_unlink: boolean;
+}
+
+export interface LinkedSocialAccount {
+  provider: SocialProvider;
+  providerEmailMasked: string | null;
+  providerEmailVerified: boolean;
+  linkedAt: string | null;
+  canUnlink: boolean;
+}

@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, from, map, switchMap, throwError } from 'rxjs';
+import { API_BASE_URL } from '../../../../core/api/api.config';
 import { ApiError } from '../../../../core/api/models/api-error.models';
 import {
   createAuthRedirectError,
@@ -18,6 +19,11 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     <p class="eyebrow">Bienvenido de vuelta</p>
     <h2>Inicia sesión</h2>
     <p class="intro">Accede a tus juegos, compras y premios con tu cuenta real de Stackflow.</p>
+
+    <div class="social-actions" aria-label="Acceso social">
+      <a class="button button--secondary" [href]="socialLoginUrl('google')">Continuar con Google</a>
+      <a class="button button--secondary" [href]="socialLoginUrl('facebook')">Continuar con Facebook</a>
+    </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="form-field">
@@ -38,7 +44,10 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       <div class="form-field">
         <div class="label-row">
           <label for="password">Contraseña</label>
-          <a routerLink="/activar">Activar invitación</a>
+          <div class="support-links">
+            <a routerLink="/recuperar-acceso">Olvidé mi contraseña</a>
+            <a routerLink="/activar">Activar invitación</a>
+          </div>
         </div>
         <input
           id="password"
@@ -63,7 +72,10 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     </form>
 
     <div class="session-check">
-      <p>Si ya tienes una sesión válida en esta pestaña, puedes restaurarla sin volver a escribir tus credenciales.</p>
+      <p>
+        Si ya tienes una sesión válida en esta pestaña, puedes restaurarla sin volver a escribir
+        tus credenciales.
+      </p>
       <button
         class="button button--secondary"
         type="button"
@@ -87,8 +99,15 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .auth-page { padding-block: var(--s6); }
     h2 { margin-bottom: var(--s2); font-size: var(--2xl); letter-spacing: -.03em; }
     .intro { margin-bottom: var(--s8); color: var(--neutral-600); }
+    .social-actions {
+      display: grid;
+      gap: var(--s3);
+      margin-bottom: var(--s5);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     form { display: grid; gap: var(--s5); }
     .label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+    .support-links { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; justify-content: flex-end; }
     .label-row a, .links a { color: var(--color-link); font-size: var(--sm); font-weight: 750; text-decoration: none; }
     .label-row a:hover, .links a:hover { color: var(--color-link-hover); text-decoration: underline; }
     .button { width: 100%; margin-top: var(--s2); }
@@ -98,7 +117,10 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .session-check { display: grid; gap: var(--s3); padding: var(--s5); margin-top: var(--s6); border: 1px solid var(--color-border); border-radius: var(--r-md); background: var(--color-surface-subtle); }
     .session-check p, .session-check small { margin: 0; color: var(--color-text-muted); font-size: var(--sm); }
     .links { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s5); }
-    @media (max-width: 36rem) { .links, .label-row { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 36rem) {
+      .links, .label-row, .support-links { align-items: flex-start; flex-direction: column; }
+      .social-actions { grid-template-columns: 1fr; }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -109,6 +131,7 @@ export class LoginPage {
   private readonly redirects = inject(AuthRedirectService);
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly apiBaseUrl = inject(API_BASE_URL);
 
   readonly submitted = signal(false);
   readonly submitting = signal(false);
@@ -124,6 +147,10 @@ export class LoginPage {
   readonly emailError = () => this.resolveFieldError('email', 'Ingresa un correo válido.');
   readonly passwordError = () =>
     this.resolveFieldError('password', 'La contraseña es obligatoria.');
+
+  socialLoginUrl(provider: 'google' | 'facebook'): string {
+    return `${this.apiBaseUrl}/auth/social/${provider}/redirect`;
+  }
 
   submit(): void {
     this.submitted.set(true);

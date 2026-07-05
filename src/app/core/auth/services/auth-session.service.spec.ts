@@ -165,6 +165,17 @@ describe('AuthSessionService', () => {
     expect(storage.read()).toBe('plain-text-token');
   });
 
+  it('completes a social exchange and stores the returned bearer token', async () => {
+    const socialLoginPromise = firstValueFrom(
+      service.completeSocialLogin({ code: 'x'.repeat(64) }),
+    );
+
+    http.expectOne(`${apiBaseUrl}/auth/social/exchange`).flush({ data: tokenDto });
+    await expect(socialLoginPromise).resolves.toMatchObject({ id: 7 });
+    expect(storage.read()).toBe('plain-text-token');
+    expect(service.abilities()).toEqual(tokenDto.abilities);
+  });
+
   it('does not persist an incomplete token response', async () => {
     const loginPromise = firstValueFrom(
       service.login({ email: 'admin@example.com', password: 'secret123' }),
@@ -181,6 +192,15 @@ describe('AuthSessionService', () => {
     await expect(loginPromise).rejects.toThrow('Invalid auth response payload.');
     expect(storage.read()).toBeNull();
     expect(service.status()).toBe('unknown');
+  });
+
+  it('keeps forgot-password as a public contract without mutating session state', async () => {
+    const forgotPromise = firstValueFrom(service.forgotPassword({ email: 'player@example.com' }));
+
+    http.expectOne(`${apiBaseUrl}/auth/forgot-password`).flush({ message: 'Secure reset message.' });
+    await expect(forgotPromise).resolves.toEqual({ message: 'Secure reset message.' });
+    expect(service.status()).toBe('unknown');
+    expect(storage.read()).toBeNull();
   });
 
   it('clears invalid restored sessions instead of leaving a token loop', async () => {

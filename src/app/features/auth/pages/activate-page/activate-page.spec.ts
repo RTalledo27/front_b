@@ -58,7 +58,7 @@ describe('ActivatePage', () => {
     fixture.componentInstance.submit();
 
     expect(session.activate).toHaveBeenCalled();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/jugador/inicio');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/verifica-tu-correo');
   });
 
   it('shows a friendly message for expired invitations', () => {

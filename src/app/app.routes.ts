@@ -71,6 +71,56 @@ export const routes: Routes = [
             ({ ActivatePage }) => ActivatePage,
           ),
       },
+      {
+        path: 'recuperar-acceso',
+        canMatch: [anonymousOnlyGuard],
+        title: 'Recuperar acceso | Fortuna',
+        loadComponent: () =>
+          import('./features/auth/pages/forgot-password-page/forgot-password-page').then(
+            ({ ForgotPasswordPage }) => ForgotPasswordPage,
+          ),
+      },
+      {
+        path: 'restablecer-acceso',
+        title: 'Restablecer acceso | Fortuna',
+        loadComponent: () =>
+          import('./features/auth/pages/reset-password-page/reset-password-page').then(
+            ({ ResetPasswordPage }) => ResetPasswordPage,
+          ),
+      },
+      {
+        path: 'verifica-tu-correo',
+        canMatch: [authGuard],
+        title: 'Verifica tu correo | Fortuna',
+        loadComponent: () =>
+          import(
+            './features/auth/pages/email-verification-notice-page/email-verification-notice-page'
+          ).then(({ EmailVerificationNoticePage }) => EmailVerificationNoticePage),
+      },
+      {
+        path: 'verificar-correo/:id/:hash',
+        title: 'Confirmar correo | Fortuna',
+        loadComponent: () =>
+          import(
+            './features/auth/pages/email-verification-callback-page/email-verification-callback-page'
+          ).then(({ EmailVerificationCallbackPage }) => EmailVerificationCallbackPage),
+      },
+      {
+        path: 'auth/social/callback',
+        title: 'Acceso social | Fortuna',
+        loadComponent: () =>
+          import('./features/auth/pages/social-auth-callback-page/social-auth-callback-page').then(
+            ({ SocialAuthCallbackPage }) => SocialAuthCallbackPage,
+          ),
+      },
+      {
+        path: 'auth/social/link/callback',
+        title: 'Vinculación social | Fortuna',
+        loadComponent: () =>
+          import('./features/auth/pages/social-link-callback-page/social-link-callback-page').then(
+            ({ SocialLinkCallbackPage }) => SocialLinkCallbackPage,
+          ),
+      },
     ],
   },
   {
@@ -200,6 +250,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/player-commerce/pages/order-detail-page/player-order-detail-page').then(
             ({ PlayerOrderDetailPage }) => PlayerOrderDetailPage,
+          ),
+      },
+      {
+        path: 'identidad',
+        title: 'Identidad | Fortuna',
+        loadComponent: () =>
+          import('./features/auth/pages/linked-social-accounts-page/linked-social-accounts-page').then(
+            ({ LinkedSocialAccountsPage }) => LinkedSocialAccountsPage,
           ),
       },
     ],

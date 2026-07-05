@@ -17,6 +17,7 @@ import { Brand } from '../../../shared/ui/brand/brand';
         <a routerLink="/jugador/cartones" routerLinkActive="active"><app-icon name="ticket" />Mis números</a>
         <a routerLink="/jugador/reservas" routerLinkActive="active"><app-icon name="bingo" />Reservas</a>
         <a routerLink="/jugador/compras" routerLinkActive="active"><app-icon name="orders" />Compras</a>
+        <a routerLink="/jugador/identidad" routerLinkActive="active"><app-icon name="users" />Identidad</a>
       </nav>
       <div class="account-actions">
         <span class="avatar" [attr.aria-label]="'Perfil de ' + displayName()">{{ initials() }}</span>
@@ -35,6 +36,7 @@ import { Brand } from '../../../shared/ui/brand/brand';
       <a routerLink="/jugador/cartones" routerLinkActive="active"><app-icon name="ticket" /><span>Números</span></a>
       <a routerLink="/jugador/reservas" routerLinkActive="active"><app-icon name="bingo" /><span>Reservas</span></a>
       <a routerLink="/jugador/compras" routerLinkActive="active"><app-icon name="orders" /><span>Compras</span></a>
+      <a routerLink="/jugador/identidad" routerLinkActive="active"><app-icon name="users" /><span>Identidad</span></a>
     </nav>`,
   styles: `
     header {
@@ -106,7 +108,7 @@ import { Brand } from '../../../shared/ui/brand/brand';
         z-index: 10;
         inset: auto 0 0;
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         border-top: 1px solid var(--neutral-200);
         background: #fff;
         padding: 0.4rem max(0.5rem, env(safe-area-inset-right))

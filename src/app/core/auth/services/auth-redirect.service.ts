@@ -9,11 +9,21 @@ export class AuthRedirectService {
   readonly loginRoute = '/login';
   readonly registerRoute = '/registro';
   readonly activateRoute = '/activar';
+  readonly forgotPasswordRoute = '/recuperar-acceso';
+  readonly resetPasswordRoute = '/restablecer-acceso';
+  readonly verifyEmailNoticeRoute = '/verifica-tu-correo';
+  readonly socialCallbackRoute = '/auth/social/callback';
+  readonly socialLinkCallbackRoute = '/auth/social/link/callback';
   readonly forbiddenRoute = '/403';
   readonly adminHomeRoute = '/admin/dashboard';
   readonly playerHomeRoute = '/jugador/inicio';
+  readonly playerIdentityRoute = '/jugador/identidad';
 
   routeForUser(user: AuthUser): string {
+    if (!user.emailVerified) {
+      return this.verifyEmailNoticeRoute;
+    }
+
     return user.capabilities.canAccessAdmin ? this.adminHomeRoute : this.playerHomeRoute;
   }
 
@@ -52,9 +62,15 @@ export class AuthRedirectService {
   }
 
   isAuthRoute(url: string): boolean {
-    return [this.loginRoute, this.registerRoute, this.activateRoute].some((route) =>
-      url.startsWith(route),
-    );
+    return [
+      this.loginRoute,
+      this.registerRoute,
+      this.activateRoute,
+      this.forgotPasswordRoute,
+      this.resetPasswordRoute,
+      this.socialCallbackRoute,
+      this.socialLinkCallbackRoute,
+    ].some((route) => url.startsWith(route));
   }
 
   isForbiddenRoute(url: string): boolean {

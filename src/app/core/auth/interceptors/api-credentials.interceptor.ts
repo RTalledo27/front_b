@@ -17,9 +17,14 @@ export const apiCredentialsInterceptor: HttpInterceptorFn = (request, next) => {
   const isAnonymousAuthRequest =
     pathname !== null &&
     apiBasePath !== null &&
-    [`${apiBasePath}/auth/login`, `${apiBasePath}/auth/register`, `${apiBasePath}/auth/activate`].includes(
-      pathname,
-    );
+    [
+      `${apiBasePath}/auth/login`,
+      `${apiBasePath}/auth/register`,
+      `${apiBasePath}/auth/activate`,
+      `${apiBasePath}/auth/forgot-password`,
+      `${apiBasePath}/auth/reset-password`,
+      `${apiBasePath}/auth/social/exchange`,
+    ].includes(pathname);
 
   if (!isApiRequest) {
     return next(request);

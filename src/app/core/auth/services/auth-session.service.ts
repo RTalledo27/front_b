@@ -6,9 +6,12 @@ import { AuthRepository } from '../data-access/auth.repository';
 import {
   ActivateRequestPayload,
   AuthUser,
+  ForgotPasswordRequestPayload,
   LoginRequestPayload,
   RegisterRequestPayload,
+  ResetPasswordRequestPayload,
   SessionStatus,
+  SocialExchangeRequestPayload,
 } from '../models/auth.models';
 import { AuthTokenStorageService } from './auth-token-storage.service';
 import { isAuthPayloadValidationError, mapAuthTokenSession, mapAuthUser } from './auth-user.mapper';
@@ -73,6 +76,21 @@ export class AuthSessionService {
     return this.authRepository.activate(payload).pipe(
       map((response) => this.applyTokenSession(response.data, sessionVersion)),
     );
+  }
+
+  completeSocialLogin(payload: SocialExchangeRequestPayload): Observable<AuthUser> {
+    const sessionVersion = this.sessionVersion;
+    return this.authRepository.socialExchange(payload).pipe(
+      map((response) => this.applyTokenSession(response.data, sessionVersion)),
+    );
+  }
+
+  forgotPassword(payload: ForgotPasswordRequestPayload) {
+    return this.authRepository.forgotPassword(payload);
+  }
+
+  resetPassword(payload: ResetPasswordRequestPayload) {
+    return this.authRepository.resetPassword(payload);
   }
 
   logout(): Observable<void> {

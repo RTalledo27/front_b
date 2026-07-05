@@ -124,6 +124,15 @@ describe('App foundation', () => {
     expect(auth?.children?.find((route) => route.path === 'registro')?.canMatch).toHaveLength(1);
     expect(auth?.children?.some((route) => route.path === 'activar')).toBe(true);
     expect(auth?.children?.find((route) => route.path === 'activar')?.canMatch).toHaveLength(1);
+    expect(auth?.children?.some((route) => route.path === 'recuperar-acceso')).toBe(true);
+    expect(auth?.children?.find((route) => route.path === 'recuperar-acceso')?.canMatch).toHaveLength(1);
+    expect(auth?.children?.some((route) => route.path === 'restablecer-acceso')).toBe(true);
+    expect(auth?.children?.some((route) => route.path === 'verifica-tu-correo')).toBe(true);
+    expect(auth?.children?.find((route) => route.path === 'verifica-tu-correo')?.canMatch).toHaveLength(1);
+    expect(auth?.children?.some((route) => route.path === 'verificar-correo/:id/:hash')).toBe(true);
+    expect(auth?.children?.some((route) => route.path === 'auth/social/callback')).toBe(true);
+    expect(auth?.children?.some((route) => route.path === 'auth/social/link/callback')).toBe(true);
+    expect(player?.children?.some((route) => route.path === 'identidad')).toBe(true);
   });
 
   it('provides a dedicated forbidden route', () => {

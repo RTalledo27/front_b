@@ -58,6 +58,26 @@ describe('apiCredentialsInterceptor', () => {
     request.flush({ data: {} });
   });
 
+  it('keeps forgot-password, reset-password, and social exchange free of bearer tokens', () => {
+    storage.write('bearer-token');
+
+    client.post(`${apiBaseUrl}/auth/forgot-password`, { email: 'user@example.com' }).subscribe();
+    client.post(`${apiBaseUrl}/auth/reset-password`, { token: 'plain', email: 'user@example.com' }).subscribe();
+    client.post(`${apiBaseUrl}/auth/social/exchange`, { code: 'x'.repeat(64) }).subscribe();
+
+    const forgotRequest = http.expectOne(`${apiBaseUrl}/auth/forgot-password`);
+    const resetRequest = http.expectOne(`${apiBaseUrl}/auth/reset-password`);
+    const socialExchangeRequest = http.expectOne(`${apiBaseUrl}/auth/social/exchange`);
+
+    expect(forgotRequest.request.headers.has('Authorization')).toBe(false);
+    expect(resetRequest.request.headers.has('Authorization')).toBe(false);
+    expect(socialExchangeRequest.request.headers.has('Authorization')).toBe(false);
+
+    forgotRequest.flush({});
+    resetRequest.flush({});
+    socialExchangeRequest.flush({});
+  });
+
   it('does not overwrite an existing authorization header', () => {
     storage.write('bearer-token');
     client

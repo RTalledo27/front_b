@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { API_BASE_URL } from '../../../../core/api/api.config';
 import { RegisterPage } from './register-page';
 import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
 import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
@@ -28,6 +29,7 @@ describe('RegisterPage', () => {
       imports: [RegisterPage],
       providers: [
         provideRouter([]),
+        { provide: API_BASE_URL, useValue: 'http://127.0.0.1:8000/api/v1' },
         AuthRedirectService,
         { provide: AuthSessionService, useValue: session },
       ],
@@ -50,7 +52,7 @@ describe('RegisterPage', () => {
     fixture.detectChanges();
 
     expect(session.register).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain('Las contrasenas no coinciden.');
+    expect(fixture.nativeElement.textContent).toContain('Las contraseñas no coinciden.');
   });
 
   it('registers and redirects on success', () => {
@@ -66,7 +68,7 @@ describe('RegisterPage', () => {
     fixture.componentInstance.submit();
 
     expect(session.register).toHaveBeenCalled();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/jugador/inicio');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/verifica-tu-correo');
   });
 
   it('shows backend validation errors', () => {

@@ -2,11 +2,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
-import { LoginPage } from './login-page';
-import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
-import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
+import { API_BASE_URL } from '../../../../core/api/api.config';
 import { AuthUser } from '../../../../core/auth/models/auth.models';
+import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
 import { createInvalidAuthPayloadError } from '../../../../core/auth/services/auth-response.utils';
+import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
+import { LoginPage } from './login-page';
 
 const player: AuthUser = {
   id: 1,
@@ -35,6 +36,7 @@ describe('LoginPage', () => {
       imports: [LoginPage],
       providers: [
         provideRouter([]),
+        { provide: API_BASE_URL, useValue: 'http://127.0.0.1:8000/api/v1' },
         AuthRedirectService,
         { provide: AuthSessionService, useValue: session },
         {
@@ -65,6 +67,20 @@ describe('LoginPage', () => {
     expect(fixture.nativeElement.textContent).toContain('Ingresa un correo');
   });
 
+  it('renders public social login links from the audited backend routes', () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+
+    const anchors = (Array.from(
+      fixture.nativeElement.querySelectorAll('.social-actions a'),
+    ) as HTMLAnchorElement[]).map((link) => link.getAttribute('href'));
+
+    expect(anchors).toEqual([
+      'http://127.0.0.1:8000/api/v1/auth/social/google/redirect',
+      'http://127.0.0.1:8000/api/v1/auth/social/facebook/redirect',
+    ]);
+  });
+
   it('submits credentials, redirects, and clears loading on success', async () => {
     session.login.mockReturnValue(of(player));
     const fixture = TestBed.createComponent(LoginPage);
@@ -89,7 +105,7 @@ describe('LoginPage', () => {
             status: 422,
             error: {
               message: 'The provided credentials are invalid.',
-              errors: { email: ['Credenciales invalidas.'] },
+              errors: { email: ['Credenciales inválidas.'] },
             },
           }),
       ),
@@ -100,7 +116,7 @@ describe('LoginPage', () => {
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Credenciales invalidas.');
+    expect(fixture.nativeElement.textContent).toContain('Credenciales inválidas.');
     expect(fixture.componentInstance.submitting()).toBe(false);
   });
 
