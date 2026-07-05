@@ -3,7 +3,6 @@ import { adminGuard, anonymousOnlyGuard, authGuard } from './core/auth/guards/au
 
 const adminSections = [
   ['rifas', 'raffles', 'Rifas'],
-  ['participantes', 'participants', 'Participantes'],
   ['reportes', 'reports', 'Reportes'],
   ['configuracion', 'settings', 'Configuración'],
 ] as const;
@@ -193,6 +192,19 @@ export const routes: Routes = [
           import('./features/admin-commerce/pages/payment-detail-page/admin-payment-detail-page').then(
             ({ AdminPaymentDetailPage }) => AdminPaymentDetailPage,
           ),
+      },
+      {
+        path: 'participantes',
+        title: 'Participantes | Fortuna',
+        loadComponent: () =>
+          import('./features/admin-players/pages/admin-players-page/admin-players-page').then(
+            ({ AdminPlayersPage }) => AdminPlayersPage,
+          ),
+      },
+      {
+        path: 'participants',
+        pathMatch: 'full',
+        redirectTo: 'participantes',
       },
       ...adminSections.map(([path, section, title]) => ({
         path,

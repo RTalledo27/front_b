@@ -71,6 +71,39 @@ describe('RegisterPage', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/verifica-tu-correo');
   });
 
+  it('renders social auth below the primary submit button with real provider links and icons', () => {
+    const fixture = TestBed.createComponent(RegisterPage);
+    fixture.detectChanges();
+
+    const submitButton = fixture.nativeElement.querySelector('form button[type="submit"]');
+    const divider = fixture.nativeElement.querySelector('.social-auth__divider');
+    const buttons = Array.from(
+      fixture.nativeElement.querySelectorAll('.social-auth__button'),
+    ) as HTMLAnchorElement[];
+    const hrefs = buttons.map((link) => link.getAttribute('href'));
+    const icons = fixture.nativeElement.querySelectorAll('.social-auth__icon svg');
+
+    expect(submitButton.textContent).toContain('Crear cuenta');
+    expect(submitButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(divider.textContent).toContain('O regístrate con');
+    expect(hrefs).toEqual([
+      'http://127.0.0.1:8000/api/v1/auth/social/google/redirect',
+      'http://127.0.0.1:8000/api/v1/auth/social/facebook/redirect',
+    ]);
+    expect(icons).toHaveLength(2);
+  });
+
+  it('keeps the login and activation links visible', () => {
+    const fixture = TestBed.createComponent(RegisterPage);
+    fixture.detectChanges();
+
+    const links = (Array.from(
+      fixture.nativeElement.querySelectorAll('.links a'),
+    ) as HTMLAnchorElement[]).map((link) => link.textContent?.trim());
+
+    expect(links).toEqual(['Ya tengo cuenta', 'Activar invitación']);
+  });
+
   it('shows backend validation errors', () => {
     session.register.mockReturnValue(
       throwError(

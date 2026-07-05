@@ -9,6 +9,7 @@ import { authErrorInterceptor } from './core/auth/interceptors/auth-error.interc
 import { provideGameNumbersRepository } from './features/game-numbers/data-access/game-numbers.provider';
 import { ADMIN_COMMERCE_REPOSITORY, HttpAdminCommerceRepository } from './features/admin-commerce/data-access/admin-commerce.repository';
 import { ADMIN_GAMES_REPOSITORY, HttpAdminGamesRepository } from './features/admin-games/data-access/admin-games.repository';
+import { ADMIN_PLAYERS_REPOSITORY, HttpAdminPlayersRepository } from './features/admin-players/data-access/admin-players.repository';
 import { GAME_ENGINE_REPOSITORY, HttpGameEngineRepository } from './features/game-engine/data-access/game-engine.repository';
 import { HttpPlayerCommerceRepository } from './features/player-commerce/data-access/http-player-commerce.repository';
 import { PLAYER_COMMERCE_REPOSITORY } from './features/player-commerce/data-access/player-commerce.repository';
@@ -26,6 +27,7 @@ export const appConfig: ApplicationConfig = {
     provideGameNumbersRepository(),
     { provide: ADMIN_COMMERCE_REPOSITORY, useClass: HttpAdminCommerceRepository },
     { provide: ADMIN_GAMES_REPOSITORY, useClass: HttpAdminGamesRepository },
+    { provide: ADMIN_PLAYERS_REPOSITORY, useClass: HttpAdminPlayersRepository },
     { provide: GAME_ENGINE_REPOSITORY, useClass: HttpGameEngineRepository },
     { provide: PLAYER_COMMERCE_REPOSITORY, useClass: HttpPlayerCommerceRepository },
     { provide: PUBLIC_GAMES_REPOSITORY, useClass: HttpPublicGamesRepository },

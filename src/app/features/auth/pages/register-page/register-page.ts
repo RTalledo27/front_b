@@ -7,19 +7,15 @@ import { API_BASE_URL } from '../../../../core/api/api.config';
 import { ApiError, toApiError } from '../../../../core/api/models/api-error.models';
 import { AuthRedirectService } from '../../../../core/auth/services/auth-redirect.service';
 import { AuthSessionService } from '../../../../core/auth/services/auth-session.service';
+import { SocialAuthButtons } from '../../components/social-auth-buttons/social-auth-buttons';
 
 @Component({
   selector: 'app-register-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, SocialAuthButtons],
   template: `<div class="auth-page">
     <p class="eyebrow">Cuenta nueva</p>
     <h2>Crea tu acceso de jugador</h2>
     <p class="intro">Regístrate con tu correo para comprar, revisar órdenes y seguir tus partidas.</p>
-
-    <div class="social-actions" aria-label="Registro social">
-      <a class="button button--secondary" [href]="socialLoginUrl('google')">Continuar con Google</a>
-      <a class="button button--secondary" [href]="socialLoginUrl('facebook')">Continuar con Facebook</a>
-    </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="form-field">
@@ -91,6 +87,12 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </button>
     </form>
 
+    <app-social-auth-buttons
+      sectionLabel="Registro social"
+      dividerLabel="O regístrate con"
+      [baseUrl]="apiBaseUrl"
+    />
+
     <div class="links">
       <a routerLink="/login">Ya tengo cuenta</a>
       <a routerLink="/activar">Activar invitación</a>
@@ -101,12 +103,6 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .auth-page { padding-block: var(--s6); }
     h2 { margin-bottom: var(--s2); font-size: var(--2xl); letter-spacing: -.03em; }
     .intro { margin-bottom: var(--s8); color: var(--neutral-600); }
-    .social-actions {
-      display: grid;
-      gap: var(--s3);
-      margin-bottom: var(--s5);
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     form { display: grid; gap: var(--s5); }
     .button { width: 100%; margin-top: var(--s2); }
     .error { color: var(--danger-600); font-size: var(--xs); font-weight: 650; }
@@ -117,7 +113,6 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .links a:hover { color: var(--color-link-hover); text-decoration: underline; }
     @media (max-width: 36rem) {
       .links { align-items: flex-start; flex-direction: column; }
-      .social-actions { grid-template-columns: 1fr; }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -128,11 +123,10 @@ export class RegisterPage {
   private readonly redirects = inject(AuthRedirectService);
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly apiBaseUrl = inject(API_BASE_URL);
-
   readonly submitted = signal(false);
   readonly submitting = signal(false);
   readonly submitError = signal<ApiError | null>(null);
+  readonly apiBaseUrl = inject(API_BASE_URL);
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.email]],
@@ -165,10 +159,6 @@ export class RegisterPage {
 
     return null;
   };
-
-  socialLoginUrl(provider: 'google' | 'facebook'): string {
-    return `${this.apiBaseUrl}/auth/social/${provider}/redirect`;
-  }
 
   submit(): void {
     this.submitted.set(true);

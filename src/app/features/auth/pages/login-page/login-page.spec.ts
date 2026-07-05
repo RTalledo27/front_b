@@ -72,13 +72,40 @@ describe('LoginPage', () => {
     fixture.detectChanges();
 
     const anchors = (Array.from(
-      fixture.nativeElement.querySelectorAll('.social-actions a'),
+      fixture.nativeElement.querySelectorAll('.social-auth__button'),
     ) as HTMLAnchorElement[]).map((link) => link.getAttribute('href'));
 
     expect(anchors).toEqual([
       'http://127.0.0.1:8000/api/v1/auth/social/google/redirect',
       'http://127.0.0.1:8000/api/v1/auth/social/facebook/redirect',
     ]);
+  });
+
+  it('renders social auth below the primary submit button with icons', () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+
+    const submitButton = fixture.nativeElement.querySelector('form button[type="submit"]');
+    const divider = fixture.nativeElement.querySelector('.social-auth__divider');
+    const buttons = fixture.nativeElement.querySelectorAll('.social-auth__button');
+    const icons = fixture.nativeElement.querySelectorAll('.social-auth__icon svg');
+
+    expect(submitButton.textContent).toContain('Ingresar a mi cuenta');
+    expect(submitButton.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(divider.textContent).toContain('O continúa con');
+    expect(buttons).toHaveLength(2);
+    expect(icons).toHaveLength(2);
+  });
+
+  it('keeps the forgot-password and activation links visible', () => {
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+
+    const links = (Array.from(
+      fixture.nativeElement.querySelectorAll('.support-links a'),
+    ) as HTMLAnchorElement[]).map((link) => link.textContent?.trim());
+
+    expect(links).toEqual(['Olvidé mi contraseña', 'Activar invitación']);
   });
 
   it('submits credentials, redirects, and clears loading on success', async () => {

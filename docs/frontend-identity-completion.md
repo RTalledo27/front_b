@@ -126,3 +126,9 @@ Cobertura validada en este bloque:
   - sin `debugger`;
   - sin marcador `[auth-login-debug]`;
   - sin `xit`/`fit`/`fdescribe` ni `it.skip`/`describe.skip`.
+
+## Auth social buttons visual polish
+
+- Login y register ahora muestran los accesos sociales debajo del CTA principal.
+- Se añadió separador visual y SVG inline local para Google y Facebook, sin dependencias nuevas.
+- Se conservaron las URLs reales de `auth/social/{provider}/redirect` y la lógica funcional existente.

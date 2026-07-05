@@ -112,6 +112,8 @@ describe('App foundation', () => {
     expect(admin?.canMatch).toHaveLength(1);
     expect(admin?.loadComponent).toBeTypeOf('function');
     expect(admin?.children?.some((route) => route.path === 'dashboard')).toBe(true);
+    expect(admin?.children?.some((route) => route.path === 'participantes')).toBe(true);
+    expect(admin?.children?.some((route) => route.path === 'participants')).toBe(true);
     expect(player?.canMatch).toHaveLength(1);
     expect(player?.loadComponent).toBeTypeOf('function');
     expect(player?.children?.some((route) => route.path === 'cartones')).toBe(true);

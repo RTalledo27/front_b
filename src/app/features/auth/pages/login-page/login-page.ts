@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, from, map, switchMap, throwError } from 'rxjs';
 import { API_BASE_URL } from '../../../../core/api/api.config';
 import { ApiError } from '../../../../core/api/models/api-error.models';
+import { SocialAuthButtons } from '../../components/social-auth-buttons/social-auth-buttons';
 import {
   createAuthRedirectError,
   toAuthFlowError,
@@ -14,16 +15,11 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
 
 @Component({
   selector: 'app-login-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, SocialAuthButtons],
   template: `<div class="auth-page">
     <p class="eyebrow">Bienvenido de vuelta</p>
     <h2>Inicia sesión</h2>
     <p class="intro">Accede a tus juegos, compras y premios con tu cuenta real de Stackflow.</p>
-
-    <div class="social-actions" aria-label="Acceso social">
-      <a class="button button--secondary" [href]="socialLoginUrl('google')">Continuar con Google</a>
-      <a class="button button--secondary" [href]="socialLoginUrl('facebook')">Continuar con Facebook</a>
-    </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="form-field">
@@ -71,6 +67,12 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </button>
     </form>
 
+    <app-social-auth-buttons
+      sectionLabel="Acceso social"
+      dividerLabel="O continúa con"
+      [baseUrl]="apiBaseUrl"
+    />
+
     <div class="session-check">
       <p>
         Si ya tienes una sesión válida en esta pestaña, puedes restaurarla sin volver a escribir
@@ -99,12 +101,6 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .auth-page { padding-block: var(--s6); }
     h2 { margin-bottom: var(--s2); font-size: var(--2xl); letter-spacing: -.03em; }
     .intro { margin-bottom: var(--s8); color: var(--neutral-600); }
-    .social-actions {
-      display: grid;
-      gap: var(--s3);
-      margin-bottom: var(--s5);
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     form { display: grid; gap: var(--s5); }
     .label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
     .support-links { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; justify-content: flex-end; }
@@ -119,7 +115,6 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .links { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s5); }
     @media (max-width: 36rem) {
       .links, .label-row, .support-links { align-items: flex-start; flex-direction: column; }
-      .social-actions { grid-template-columns: 1fr; }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,14 +126,13 @@ export class LoginPage {
   private readonly redirects = inject(AuthRedirectService);
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly apiBaseUrl = inject(API_BASE_URL);
-
   readonly submitted = signal(false);
   readonly submitting = signal(false);
   readonly checkingSession = signal(false);
   readonly submitError = signal<ApiError | null>(null);
   readonly sessionMessage = signal<string | null>(null);
   readonly returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+  readonly apiBaseUrl = inject(API_BASE_URL);
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
@@ -147,10 +141,6 @@ export class LoginPage {
   readonly emailError = () => this.resolveFieldError('email', 'Ingresa un correo válido.');
   readonly passwordError = () =>
     this.resolveFieldError('password', 'La contraseña es obligatoria.');
-
-  socialLoginUrl(provider: 'google' | 'facebook'): string {
-    return `${this.apiBaseUrl}/auth/social/${provider}/redirect`;
-  }
 
   submit(): void {
     this.submitted.set(true);
