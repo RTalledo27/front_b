@@ -151,11 +151,9 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
             </div>
 
             @if (showStartGuidance()) {
-              <div class="operational-guidance">
-                <p class="operational-guidance__title">
-                  Antes de iniciar, el backend revisará estas condiciones conocidas:
-                </p>
-                <ul class="operational-guidance__list">
+              <div class="read-only-note operational-note">
+                <p><strong>Antes de iniciar, el backend revisará estas condiciones conocidas:</strong></p>
+                <ul class="guidance-list">
                   @for (item of startReadinessGuidance(); track item) {
                     <li>{{ item }}</li>
                   }
@@ -736,6 +734,11 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       display: grid;
       gap: var(--s3);
     }
+    .technical-panel {
+      display: grid;
+      gap: var(--s3);
+      border: 1px dashed var(--color-border);
+    }
     .hero-meta {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -752,51 +755,28 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       margin-top: .25rem;
       text-align: left;
     }
-    .technical-panel {
-      display: grid;
-      gap: var(--s3);
-      border: 1px dashed var(--color-border);
-    }
-    .start-panel__header {
-      display: flex;
-      gap: var(--s4);
-      justify-content: space-between;
-      align-items: flex-start;
-    }
-    .command-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--s3);
-    }
-    .operational-guidance {
-      padding: var(--s3);
-      border-radius: var(--r-md);
-      background: var(--neutral-50);
-    }
-    .operational-guidance__title {
-      margin: 0;
-      color: var(--color-text);
-      font-weight: 700;
-    }
-    .operational-guidance__list {
-      display: grid;
-      gap: var(--s2);
-      margin: var(--s3) 0 0;
-      padding-left: 1.15rem;
-    }
-    .operational-guidance__list li {
-      overflow-wrap: anywhere;
-    }
+    .start-panel__header,
     .technical-panel__header {
       display: flex;
       gap: var(--s4);
       justify-content: space-between;
       align-items: flex-start;
     }
-    .technical-actions {
+    .command-actions,
+    .technical-actions,
+    .confirm-box__actions {
       display: flex;
       flex-wrap: wrap;
       gap: var(--s3);
+    }
+    .guidance-list {
+      display: grid;
+      gap: var(--s2);
+      margin: var(--s3) 0 0;
+      padding-left: 1.15rem;
+    }
+    .guidance-list li {
+      overflow-wrap: anywhere;
     }
     .confirm-box {
       padding: var(--s4);
@@ -810,11 +790,6 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
     .confirm-box h4,
     .confirm-box p {
       margin-top: 0;
-    }
-    .confirm-box__actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--s3);
     }
     .feedback {
       margin: 0;
@@ -835,6 +810,9 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       border-radius: var(--r-md);
       background: var(--neutral-50);
       color: var(--color-text-muted);
+    }
+    .operational-note p {
+      margin: 0;
     }
     .summary-grid,
     .audit-grid {
