@@ -10,6 +10,7 @@ import { AuthTokenStorageService } from './core/auth/services/auth-token-storage
 describe('App foundation', () => {
   it('renders the application router outlet', async () => {
     const session = {
+      clearSession: vi.fn(),
       ensureSession: vi.fn(() => of(null)),
       status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('anonymous'),
     };
@@ -28,12 +29,14 @@ describe('App foundation', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
+    expect(session.clearSession).toHaveBeenCalledTimes(1);
     expect(session.ensureSession).not.toHaveBeenCalled();
   });
 
   it('hydrates an existing session on startup and shows a temporary overlay', async () => {
     const restoration = new Subject<null>();
     const session = {
+      clearSession: vi.fn(),
       ensureSession: vi.fn(() => restoration.asObservable()),
       status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('loading'),
     };
@@ -54,6 +57,7 @@ describe('App foundation', () => {
     fixture.detectChanges();
 
     expect(session.ensureSession).toHaveBeenCalledTimes(1);
+    expect(session.clearSession).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Recuperando tu sesión');
 
     restoration.next(null);
@@ -65,6 +69,7 @@ describe('App foundation', () => {
 
   it('removes the overlay even if session restoration fails', async () => {
     const session = {
+      clearSession: vi.fn(),
       ensureSession: vi.fn(() => throwError(() => new Error('boom'))),
       status: signal<'unknown' | 'loading' | 'authenticated' | 'anonymous' | 'error'>('loading'),
     };
@@ -85,6 +90,7 @@ describe('App foundation', () => {
     fixture.detectChanges();
 
     expect(session.ensureSession).toHaveBeenCalledTimes(1);
+    expect(session.clearSession).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).not.toContain('Recuperando tu sesión');
   });
 

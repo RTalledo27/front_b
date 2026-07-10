@@ -20,6 +20,7 @@ export class App {
 
   constructor() {
     if (!this.restoringSession()) {
+      this.session.clearSession();
       return;
     }
 

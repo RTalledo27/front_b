@@ -181,11 +181,23 @@ describe('AdminGamesPage', () => {
   it('clears filters through navigation and shows loading accessibly', async () => {
     const facade = createFacadeMock();
     facade.status.set('loading');
+    facade.games.set([]);
+    facade.pageInfo.set({
+      currentPage: 1,
+      from: 0,
+      lastPage: 1,
+      path: '/api/v1/admin/games',
+      perPage: 20,
+      to: 0,
+      total: 0,
+    });
     const { fixture } = await createComponent(facade);
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Consultando el listado administrativo real');
+    expect(fixture.nativeElement.textContent).not.toContain('Página 1 de 1 · 0 juegos');
 
     facade.status.set('loaded');
     fixture.detectChanges();

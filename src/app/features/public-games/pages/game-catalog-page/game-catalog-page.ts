@@ -32,7 +32,7 @@ import {
       <div class="section-heading">
         <div>
           <h2>Juegos publicados</h2>
-          <p>{{ facade.pageInfo().total }} opciones encontradas</p>
+          <p>{{ resultsSummary() }}</p>
         </div>
         <app-status-badge tone="info">Información en tiempo real</app-status-badge>
       </div>
@@ -355,5 +355,13 @@ export class GameCatalogPage {
 
   constructor() {
     this.facade.load();
+  }
+
+  protected resultsSummary(): string {
+    if (this.facade.status() === 'loading') {
+      return 'Consultando el catálogo real de Laravel…';
+    }
+
+    return `${this.facade.pageInfo().total} opciones encontradas`;
   }
 }

@@ -256,10 +256,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
           </label>
         </form>
 
-        <p class="filters-summary" aria-live="polite">
-          Página {{ facade.pageInfo().currentPage }} de {{ facade.pageInfo().lastPage }} ·
-          {{ facade.pageInfo().total }} juegos
-        </p>
+        <p class="filters-summary" aria-live="polite">{{ resultsSummary() }}</p>
       </section>
 
       <div class="feedback" aria-live="polite" aria-atomic="true">
@@ -746,6 +743,14 @@ export class AdminGamesPage {
 
   reload(): void {
     this.facade.load(readQueryFromRoute(this.route.snapshot.queryParamMap));
+  }
+
+  resultsSummary(): string {
+    if (this.facade.status() === 'loading' && this.facade.games().length === 0) {
+      return 'Consultando el listado administrativo real…';
+    }
+
+    return `Página ${this.facade.pageInfo().currentPage} de ${this.facade.pageInfo().lastPage} · ${this.facade.pageInfo().total} juegos`;
   }
 
   private readQueryFromForm(page: number): AdminGameListQuery {

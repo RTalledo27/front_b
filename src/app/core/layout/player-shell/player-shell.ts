@@ -94,12 +94,13 @@ import { Brand } from '../../../shared/ui/brand/brand';
       margin-left: auto;
     }
     main {
+      min-width: 0;
       padding: clamp(1rem, 4vw, 3rem);
     }
     .bottom {
       display: none;
     }
-    @media (max-width: 40rem) {
+    @media (max-width: 52rem) {
       header nav {
         display: none;
       }
