@@ -25,7 +25,30 @@ export function mapPublicGame(dto: PublicGameApiDto): PublicGame {
       salesClosesAt: dto.schedule.sales_closes_at,
       scheduledStartAt: dto.schedule.scheduled_start_at,
       drawIntervalSeconds: dto.schedule.draw_interval_seconds,
+      nextDrawAt: dto.schedule.next_draw_at ?? null,
     },
+    lifecycle: {
+      startedAt: dto.lifecycle?.started_at ?? null,
+      pausedAt: dto.lifecycle?.paused_at ?? null,
+      completedAt: dto.lifecycle?.completed_at ?? null,
+    },
+    latestDraw:
+      dto.latest_draw === null || typeof dto.latest_draw === 'undefined'
+        ? null
+        : {
+            sequence: dto.latest_draw.sequence,
+            number: dto.latest_draw.number,
+            drawnAt: dto.latest_draw.drawn_at,
+          },
+    winner:
+      dto.winner === null || typeof dto.winner === 'undefined'
+        ? null
+        : {
+            number: dto.winner.number,
+            drawSequence: dto.winner.draw_sequence,
+            hits: dto.winner.hits,
+            wonAt: dto.winner.won_at,
+          },
   };
 }
 

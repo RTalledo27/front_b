@@ -20,7 +20,15 @@ const gameDto: PublicGameApiDto = {
     sales_closes_at: null,
     scheduled_start_at: '2026-06-21T21:00:00Z',
     draw_interval_seconds: 8,
+    next_draw_at: null,
   },
+  lifecycle: {
+    started_at: null,
+    paused_at: null,
+    completed_at: null,
+  },
+  latest_draw: null,
+  winner: null,
 };
 
 describe('HttpPublicGamesRepository', () => {

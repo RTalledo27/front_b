@@ -2,6 +2,8 @@ import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiError } from '../../../core/api/models/api-error.models';
 import { map } from 'rxjs';
+import { PUBLIC_GAMES_REPOSITORY } from '../../public-games/data-access/public-games.repository';
+import { PublicGame } from '../../public-games/models/public-game.models';
 import {
   PlayerCommerceViewStatus,
   PlayerEntryView,
@@ -13,6 +15,7 @@ import {
   resolvePlayerCommerceError,
 } from './player-commerce.mapper';
 import { PLAYER_COMMERCE_REPOSITORY } from './player-commerce.repository';
+import { catchError, from, mergeMap, of, toArray } from 'rxjs';
 
 @Injectable()
 export class PlayerReservationsFacade {
@@ -51,11 +54,16 @@ export class PlayerReservationsFacade {
 @Injectable()
 export class PlayerEntriesFacade {
   private readonly repository = inject(PLAYER_COMMERCE_REPOSITORY);
+  private readonly gamesRepository = inject(PUBLIC_GAMES_REPOSITORY);
   private readonly destroyRef = inject(DestroyRef);
+  private liveVersion = 0;
 
   readonly items = signal<PlayerEntryView[]>([]);
   readonly status = signal<PlayerCommerceViewStatus>('idle');
   readonly error = signal<ApiError | null>(null);
+  readonly liveGames = signal<Record<string, PublicGame>>({});
+  readonly liveGamesStatus = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  readonly liveGamesError = signal<ApiError | null>(null);
 
   load(): void {
     this.status.set('loading');
@@ -71,13 +79,79 @@ export class PlayerEntriesFacade {
         next: (items) => {
           this.items.set(items);
           this.status.set(items.length > 0 ? 'loaded' : 'empty');
+          this.loadLiveGames(items);
         },
         error: (error: unknown) => {
           const apiError = resolvePlayerCommerceError(error);
           this.items.set([]);
           this.error.set(apiError);
           this.status.set(resolveReadStatus(apiError.status));
+          this.loadLiveGames([]);
         },
+      });
+  }
+
+  gameLiveState(gameId: string | null | undefined): PublicGame | null {
+    if (!gameId) {
+      return null;
+    }
+
+    return this.liveGames()[gameId] ?? null;
+  }
+
+  private loadLiveGames(items: readonly PlayerEntryView[]): void {
+    const targets = new Map<string, string>();
+
+    for (const item of items) {
+      if (item.game !== null) {
+        targets.set(item.game.id, item.game.slug);
+      }
+    }
+
+    if (targets.size === 0) {
+      this.liveVersion += 1;
+      this.liveGames.set({});
+      this.liveGamesStatus.set('idle');
+      this.liveGamesError.set(null);
+      return;
+    }
+
+    const version = ++this.liveVersion;
+    this.liveGamesStatus.set('loading');
+    this.liveGamesError.set(null);
+
+    from([...targets.entries()])
+      .pipe(
+        mergeMap(([gameId, slug]) =>
+          this.gamesRepository.getBySlug(slug).pipe(
+            map((game) => ({ gameId, game, error: null as ApiError | null })),
+            catchError((error: unknown) =>
+              of({ gameId, game: null, error: resolvePlayerCommerceError(error) }),
+            ),
+          ),
+        ),
+        toArray(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((results) => {
+        if (version !== this.liveVersion) {
+          return;
+        }
+
+        const nextGames: Record<string, PublicGame> = {};
+        let firstError: ApiError | null = null;
+
+        for (const result of results) {
+          if (result.game !== null) {
+            nextGames[result.gameId] = result.game;
+          } else if (firstError === null) {
+            firstError = result.error;
+          }
+        }
+
+        this.liveGames.set(nextGames);
+        this.liveGamesError.set(firstError);
+        this.liveGamesStatus.set(Object.keys(nextGames).length > 0 ? 'loaded' : 'error');
       });
   }
 }

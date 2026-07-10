@@ -38,6 +38,26 @@ export interface GameScheduleApiDto {
   sales_closes_at: string | null;
   scheduled_start_at: string | null;
   draw_interval_seconds: number;
+  next_draw_at?: string | null;
+}
+
+export interface GameLifecycleApiDto {
+  started_at: string | null;
+  paused_at: string | null;
+  completed_at: string | null;
+}
+
+export interface PublicGameLatestDrawApiDto {
+  sequence: number;
+  number: number;
+  drawn_at: string;
+}
+
+export interface PublicGameWinnerApiDto {
+  number: number;
+  draw_sequence: number;
+  hits: number;
+  won_at: string;
 }
 
 export interface PublicGameApiDto {
@@ -54,4 +74,7 @@ export interface PublicGameApiDto {
   ticket_price: MoneyApiDto;
   prize: MoneyApiDto;
   schedule: GameScheduleApiDto;
+  lifecycle?: GameLifecycleApiDto;
+  latest_draw?: PublicGameLatestDrawApiDto | null;
+  winner?: PublicGameWinnerApiDto | null;
 }

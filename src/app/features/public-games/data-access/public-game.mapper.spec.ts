@@ -16,7 +16,19 @@ const gameDto: PublicGameApiDto = {
     sales_closes_at: '2026-06-21T20:00:00Z',
     scheduled_start_at: '2026-06-21T21:00:00Z',
     draw_interval_seconds: 8,
+    next_draw_at: '2026-06-21T21:00:08Z',
   },
+  lifecycle: {
+    started_at: '2026-06-21T21:00:00Z',
+    paused_at: null,
+    completed_at: null,
+  },
+  latest_draw: {
+    sequence: 14,
+    number: 32,
+    drawn_at: '2026-06-21T21:01:52Z',
+  },
+  winner: null,
 };
 
 describe('public game mapper', () => {
@@ -28,6 +40,41 @@ describe('public game mapper', () => {
     expect(game.hitsRequired).toBe(15);
     expect(game.ticketPrice.amountCents).toBe(500);
     expect(game.schedule.drawIntervalSeconds).toBe(8);
+    expect(game.schedule.nextDrawAt).toBe('2026-06-21T21:00:08Z');
+    expect(game.lifecycle.startedAt).toBe('2026-06-21T21:00:00Z');
+    expect(game.latestDraw?.number).toBe(32);
+    expect(game.winner).toBeNull();
+  });
+
+  it('maps a completed winner payload when the backend exposes it publicly', () => {
+    const game = mapPublicGame({
+      ...gameDto,
+      status: 'completed',
+      schedule: {
+        ...gameDto.schedule,
+        next_draw_at: null,
+      },
+      lifecycle: {
+        started_at: '2026-06-21T21:00:00Z',
+        paused_at: null,
+        completed_at: '2026-06-21T21:30:00Z',
+      },
+      winner: {
+        number: 44,
+        draw_sequence: 28,
+        hits: 5,
+        won_at: '2026-06-21T21:30:00Z',
+      },
+    });
+
+    expect(game.winner).toEqual({
+      number: 44,
+      drawSequence: 28,
+      hits: 5,
+      wonAt: '2026-06-21T21:30:00Z',
+    });
+    expect(game.schedule.nextDrawAt).toBeNull();
+    expect(game.lifecycle.completedAt).toBe('2026-06-21T21:30:00Z');
   });
 
   it('preserves Laravel pagination metadata', () => {

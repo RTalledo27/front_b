@@ -99,6 +99,49 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
           <a class="button" routerLink="/bingos">Explorar bingos</a>
         </section>
       } @else {
+        @if (facade.runningGames().length) {
+          <section class="surface-card live-games" aria-label="Juegos en vivo del jugador">
+            <header>
+              <div>
+                <p class="eyebrow">Juego en vivo</p>
+                <h2>Tienes actividad en ejecución</h2>
+              </div>
+              <a class="button button--secondary" routerLink="/jugador/cartones">Abrir cartones</a>
+            </header>
+
+            <div class="live-games__grid">
+              @for (game of facade.runningGames(); track game.id) {
+                <article class="live-games__card">
+                  <div>
+                    <strong>{{ game.name }}</strong>
+                    <p>
+                      @if (game.latestDraw; as latestDraw) {
+                        Último número sorteado: {{ latestDraw.number }} · sorteo #{{ latestDraw.sequence }}
+                      } @else {
+                        El juego ya está corriendo, pero el backend todavía no publicó un último sorteo.
+                      }
+                    </p>
+                  </div>
+                  <div class="live-games__meta">
+                    <app-status-badge tone="info">Juego en vivo</app-status-badge>
+                    <small>
+                      {{
+                        game.schedule.nextDrawAt
+                          ? 'Próxima referencia ' + date(game.schedule.nextDrawAt)
+                          : 'Actualización pública cada ' + game.schedule.drawIntervalSeconds + ' s'
+                      }}
+                    </small>
+                  </div>
+                  <div class="live-games__actions">
+                    <a [routerLink]="['/bingos', game.slug]">Ver juego</a>
+                    <a routerLink="/jugador/cartones">Ver mis cartones</a>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
         <section class="summary-grid" aria-label="Resumen de actividad real">
           <article class="surface-card summary-card">
             <p class="eyebrow">Órdenes</p>
@@ -327,6 +370,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
     .hero__copy,
     .hero__account,
     .hero__account dl,
+    .live-games,
     .summary-card,
     .detail-card,
     .data-state,
@@ -375,9 +419,52 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
 
     .summary-grid,
     .content-grid,
+    .live-games__grid,
     .list {
       display: grid;
       gap: var(--s4);
+    }
+
+    .live-games {
+      padding: var(--s5);
+    }
+
+    .live-games header,
+    .live-games__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s3);
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .live-games__grid {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    }
+
+    .live-games__card {
+      display: grid;
+      gap: var(--s3);
+      min-width: 0;
+      padding: var(--s4);
+      border-radius: var(--r-lg);
+      background: var(--color-surface-subtle);
+    }
+
+    .live-games__card strong,
+    .live-games__card p,
+    .live-games__card small {
+      margin: 0;
+    }
+
+    .live-games__meta {
+      display: grid;
+      gap: var(--s2);
+    }
+
+    .live-games__actions a {
+      color: var(--color-link);
+      font-weight: 750;
     }
 
     .summary-grid {

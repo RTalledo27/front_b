@@ -2,6 +2,8 @@ import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiError } from '../../../core/api/models/api-error.models';
 import { AuthSessionService } from '../../../core/auth/services/auth-session.service';
+import { PUBLIC_GAMES_REPOSITORY } from '../../public-games/data-access/public-games.repository';
+import { PublicGame } from '../../public-games/models/public-game.models';
 import {
   mapPlayerEntriesResponse,
   mapPlayerOrdersResponse,
@@ -15,6 +17,7 @@ import {
   PlayerOrderSummary,
   PlayerReservationView,
 } from '../../player-commerce/models/player-commerce-view.models';
+import { catchError, from, map, mergeMap, of, toArray } from 'rxjs';
 
 export type PlayerHomePageStatus =
   | 'idle'
@@ -30,8 +33,10 @@ export type PlayerHomePageStatus =
 @Injectable()
 export class PlayerHomeFacade {
   private readonly repository = inject(PLAYER_COMMERCE_REPOSITORY);
+  private readonly gamesRepository = inject(PUBLIC_GAMES_REPOSITORY);
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
+  private liveVersion = 0;
 
   readonly orders = signal<readonly PlayerOrderSummary[]>([]);
   readonly ordersTotal = signal(0);
@@ -47,11 +52,20 @@ export class PlayerHomeFacade {
   readonly entriesTotal = signal(0);
   readonly entriesStatus = signal<PlayerCommerceViewStatus>('idle');
   readonly entriesError = signal<ApiError | null>(null);
+  readonly liveGames = signal<Record<string, PublicGame>>({});
+  readonly liveGamesStatus = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  readonly liveGamesError = signal<ApiError | null>(null);
 
   readonly user = computed(() => this.session.user());
   readonly latestOrder = computed(() => this.orders()[0] ?? null);
   readonly latestReservation = computed(() => this.reservations()[0] ?? null);
   readonly latestEntry = computed(() => this.entries()[0] ?? null);
+  readonly runningGames = computed(() =>
+    Object.values(this.liveGames()).filter((game) => game.status === 'running'),
+  );
+  readonly completedGames = computed(() =>
+    Object.values(this.liveGames()).filter((game) => game.status === 'completed'),
+  );
   readonly failedSections = computed(() => {
     const failed: string[] = [];
 
@@ -183,6 +197,7 @@ export class PlayerHomeFacade {
             this.reservations.set(items.slice(0, 3));
             this.reservationsTotal.set(response.meta.total);
             this.reservationsStatus.set(response.meta.total > 0 ? 'loaded' : 'empty');
+            this.refreshLiveGames();
           } catch (error: unknown) {
             this.applyReservationsError(resolvePlayerCommerceError(error));
           }
@@ -211,6 +226,7 @@ export class PlayerHomeFacade {
             this.entries.set(items.slice(0, 3));
             this.entriesTotal.set(response.meta.total);
             this.entriesStatus.set(response.meta.total > 0 ? 'loaded' : 'empty');
+            this.refreshLiveGames();
           } catch (error: unknown) {
             this.applyEntriesError(resolvePlayerCommerceError(error));
           }
@@ -244,6 +260,78 @@ export class PlayerHomeFacade {
     this.entriesTotal.set(0);
     this.entriesError.set(apiError);
     this.entriesStatus.set(resolveReadStatus(apiError.status));
+    this.refreshLiveGames();
+  }
+
+  gameLiveState(gameId: string | null | undefined): PublicGame | null {
+    if (!gameId) {
+      return null;
+    }
+
+    return this.liveGames()[gameId] ?? null;
+  }
+
+  private refreshLiveGames(): void {
+    const targets = new Map<string, string>();
+
+    for (const reservation of this.reservations()) {
+      const game = reservation.gameNumber.game;
+      if (game !== null) {
+        targets.set(game.id, game.slug);
+      }
+    }
+
+    for (const entry of this.entries()) {
+      if (entry.game !== null) {
+        targets.set(entry.game.id, entry.game.slug);
+      }
+    }
+
+    if (targets.size === 0) {
+      this.liveVersion += 1;
+      this.liveGames.set({});
+      this.liveGamesStatus.set('idle');
+      this.liveGamesError.set(null);
+      return;
+    }
+
+    const version = ++this.liveVersion;
+    this.liveGamesStatus.set('loading');
+    this.liveGamesError.set(null);
+
+    from([...targets.entries()])
+      .pipe(
+        mergeMap(([gameId, slug]) =>
+          this.gamesRepository.getBySlug(slug).pipe(
+            map((game) => ({ gameId, game, error: null as ApiError | null })),
+            catchError((error: unknown) =>
+              of({ gameId, game: null, error: resolvePlayerCommerceError(error) }),
+            ),
+          ),
+        ),
+        toArray(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((results) => {
+        if (version !== this.liveVersion) {
+          return;
+        }
+
+        const nextGames: Record<string, PublicGame> = {};
+        let firstError: ApiError | null = null;
+
+        for (const result of results) {
+          if (result.game !== null) {
+            nextGames[result.gameId] = result.game;
+          } else if (firstError === null) {
+            firstError = result.error;
+          }
+        }
+
+        this.liveGames.set(nextGames);
+        this.liveGamesError.set(firstError);
+        this.liveGamesStatus.set(Object.keys(nextGames).length > 0 ? 'loaded' : 'error');
+      });
   }
 }
 

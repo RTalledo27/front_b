@@ -94,6 +94,69 @@ import {
               </dl>
             </section>
 
+            <section class="surface-card live-state" aria-labelledby="live-state-title">
+              <div class="section-heading live-state__heading">
+                <div>
+                  <p class="eyebrow">Estado publicado</p>
+                  <h2 id="live-state-title">{{ liveHeading(game.status) }}</h2>
+                </div>
+                @if (facade.refreshing()) {
+                  <span class="live-pill">Actualizando…</span>
+                } @else if (facade.lastUpdatedAt()) {
+                  <span class="live-pill">Actualizado {{ formatDate(facade.lastUpdatedAt()) }}</span>
+                }
+              </div>
+
+              <p>{{ liveSummary(game.status) }}</p>
+
+              @if (game.latestDraw; as latestDraw) {
+                <div class="live-highlight">
+                  <span>Último número sorteado</span>
+                  <strong>{{ latestDraw.number }}</strong>
+                  <small>
+                    Sorteo #{{ latestDraw.sequence }} · {{ formatDate(latestDraw.drawnAt) }}
+                  </small>
+                </div>
+              }
+
+              @if (game.status === 'running') {
+                <dl class="live-facts">
+                  <div>
+                    <dt>Siguiente actualización esperada</dt>
+                    <dd>{{ runningUpdateLabel(game) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Inicio del juego</dt>
+                    <dd>{{ formatDate(game.lifecycle.startedAt) }}</dd>
+                  </div>
+                </dl>
+              }
+
+              @if (game.status === 'completed') {
+                @if (game.winner; as winner) {
+                  <div class="winner-card">
+                    <h3>Ganador publicado</h3>
+                    <p>El número {{ winner.number }} ganó con {{ winner.hits }} aciertos.</p>
+                    <small>
+                      Sorteo #{{ winner.drawSequence }} · {{ formatDate(winner.wonAt) }}
+                    </small>
+                  </div>
+                } @else {
+                  <div class="winner-card winner-card--muted">
+                    <h3>Resultado pendiente de publicación</h3>
+                    <p>El juego terminó, pero este contrato público todavía no expone un ganador.</p>
+                  </div>
+                }
+              }
+
+              @if (facade.liveError()) {
+                <p class="live-inline-error">
+                  No pudimos refrescar la información en vivo. Conservamos el último estado público
+                  disponible.
+                </p>
+              }
+            </section>
+
             <aside class="surface-card participation" aria-labelledby="participation-title">
               <span class="ticket-icon" aria-hidden="true">F</span>
               <p class="eyebrow">Participación</p>
@@ -123,8 +186,9 @@ import {
     .prize { padding: var(--s6); border: 1px solid rgb(255 255 255 / .14); border-radius: var(--r-lg); background: rgb(255 255 255 / .07); text-align: center; }
     .prize p, .prize span { display: block; margin: 0; color: #d9e1ec; font-size: var(--sm); }
     .prize strong { display: block; margin: var(--s2) 0; color: var(--color-prize); font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.04em; }
-    .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: var(--s5); margin-top: var(--s5); align-items: start; }
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .95fr) 21rem; gap: var(--s5); margin-top: var(--s5); align-items: start; }
     .information, .participation { padding: clamp(1.25rem, 4vw, 2rem); }
+    .live-state { padding: clamp(1.25rem, 4vw, 2rem); }
     .section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding-bottom: var(--s5); border-bottom: 1px solid var(--color-border); }
     .section-heading h2, .participation h2 { margin: 0; font-size: var(--2xl); letter-spacing: -.03em; }
     .number-range { flex: none; padding: .65rem .8rem; border-radius: var(--r-md); background: var(--color-brand-subtle); color: var(--color-brand-strong); font-weight: 850; }
@@ -146,7 +210,8 @@ import {
     .state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s3); margin-top: var(--s3); }
     .loader { width: 2.5rem; height: 2.5rem; border: 3px solid var(--color-brand-muted); border-top-color: var(--color-brand); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @media (max-width: 55rem) { .hero, .content-grid { grid-template-columns: 1fr; } .participation { position: static; } }
+    @media (max-width: 72rem) { .content-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .participation { grid-column: 1 / -1; position: static; } }
+    @media (max-width: 55rem) { .hero, .content-grid { grid-template-columns: 1fr; } }
     @media (max-width: 38rem) { .detail { padding-inline: var(--s4); } .hero { padding: var(--s6); } .facts { grid-template-columns: 1fr; } .facts div:nth-child(odd), .facts div:nth-child(even) { padding-inline: 0; border-left: 0; } .section-heading { align-items: flex-start; } .state-actions, .state-actions .button { width: 100%; } }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -175,9 +240,9 @@ export class GameDetailPage {
       case 'sales_closed':
         return 'Las ventas ya se cerraron. El backend prepara el juego para su inicio operativo y ya no acepta nuevas reservas.';
       case 'running':
-        return 'Este juego ya está en curso. Puedes revisar la información publicada, pero ya no admite nuevas participaciones.';
+        return 'Este juego ya está en vivo. Puedes seguir el estado publicado y el último sorteo informado, pero ya no admite nuevas participaciones.';
       case 'completed':
-        return 'Este juego ya finalizó. La pantalla pública conserva el contexto informativo sin inventar un dashboard adicional.';
+        return 'Este juego ya finalizó. La pantalla pública conserva el estado real, incluido el ganador si el backend ya lo publicó.';
       default:
         return 'Revisa la disponibilidad pública y espera a que la venta abra para reservar con tu cuenta.';
     }
@@ -199,10 +264,51 @@ export class GameDetailPage {
   participationNote(status: string): string {
     switch (status) {
       case 'running':
+        return 'Mientras el juego siga running, refrescamos este estado con el contrato público sin bloquear la pantalla.';
       case 'completed':
-        return 'El estado visible viene del backend real del juego. No mostramos un dashboard en vivo sin contrato dedicado.';
+        return 'El resultado final se muestra sólo con datos públicos reales del backend.';
       default:
         return 'La reserva usa contratos reales, autenticación e idempotencia del backend.';
     }
+  }
+
+  liveHeading(status: string): string {
+    switch (status) {
+      case 'running':
+        return 'Juego en vivo';
+      case 'completed':
+        return 'Juego finalizado';
+      case 'sales_closed':
+        return 'Esperando inicio operativo';
+      case 'sales_open':
+        return 'Ventas abiertas';
+      default:
+        return 'Estado publicado del juego';
+    }
+  }
+
+  liveSummary(status: string): string {
+    switch (status) {
+      case 'running':
+        return 'El backend público ya reporta este juego en ejecución. Aquí mostramos sólo el último estado publicado y seguimos refrescando sin recargar toda la página.';
+      case 'completed':
+        return 'El backend marcó este juego como completado. Si el ganador fue publicado en el contrato público, lo verás aquí.';
+      case 'sales_closed':
+        return 'Las ventas ya cerraron. El inicio real depende de las condiciones operativas que valida el backend al comenzar el juego.';
+      case 'sales_open':
+        return 'Todavía puedes participar. Cuando el backend cambie el estado a running o completed, esta vista lo reflejará.';
+      default:
+        return 'Este detalle usa el contrato público real del backend.';
+    }
+  }
+
+  runningUpdateLabel(game: {
+    schedule: { nextDrawAt: string | null; drawIntervalSeconds: number };
+  }): string {
+    if (game.schedule.nextDrawAt) {
+      return formatGameDate(game.schedule.nextDrawAt);
+    }
+
+    return `Cada ${game.schedule.drawIntervalSeconds} segundos aproximadamente`;
   }
 }

@@ -32,7 +32,15 @@ const game: PublicGame = {
     salesClosesAt: null,
     scheduledStartAt: null,
     drawIntervalSeconds: 10,
+    nextDrawAt: null,
   },
+  lifecycle: {
+    startedAt: null,
+    pausedAt: null,
+    completedAt: null,
+  },
+  latestDraw: null,
+  winner: null,
 };
 
 const availability: GameNumbersAvailability = {

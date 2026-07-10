@@ -5,6 +5,38 @@ import { provideRouter } from '@angular/router';
 import { describe, expect, it, vi } from 'vitest';
 import { PlayerHomeFacade } from '../../data-access/player-home.facade';
 import { PlayerHomePage } from './player-home-page';
+import { PublicGame } from '../../../public-games/models/public-game.models';
+
+const runningGame: PublicGame = {
+  id: 'game-1',
+  slug: 'bingo-real',
+  name: 'Bingo Real',
+  description: null,
+  status: 'running',
+  numberMin: 1,
+  numberMax: 90,
+  hitsRequired: 5,
+  ticketPrice: { amountCents: 500, currency: 'PEN' },
+  prize: { amountCents: 10000, currency: 'PEN' },
+  schedule: {
+    salesOpensAt: null,
+    salesClosesAt: null,
+    scheduledStartAt: '2026-07-05T12:00:00Z',
+    drawIntervalSeconds: 8,
+    nextDrawAt: '2026-07-05T12:00:08Z',
+  },
+  lifecycle: {
+    startedAt: '2026-07-05T12:00:00Z',
+    pausedAt: null,
+    completedAt: null,
+  },
+  latestDraw: {
+    sequence: 2,
+    number: 11,
+    drawnAt: '2026-07-05T12:00:08Z',
+  },
+  winner: null,
+};
 
 function createFacadeMock() {
   const latestOrder = signal<{
@@ -174,6 +206,11 @@ function createFacadeMock() {
     entriesTotal: signal(1),
     entriesStatus: signal<'loaded' | 'empty' | 'unauthorized' | 'forbidden' | 'networkError' | 'unexpectedError' | 'notFound'>('loaded'),
     entriesError: signal<{ message: string } | null>(null),
+    liveGames: signal<Record<string, PublicGame>>({ [runningGame.id]: runningGame }),
+    liveGamesStatus: signal<'idle' | 'loading' | 'loaded' | 'error'>('loaded'),
+    liveGamesError: signal<{ message: string } | null>(null),
+    runningGames: signal([runningGame]),
+    completedGames: signal([]),
     latestOrder,
     latestReservation,
     latestEntry,
@@ -223,6 +260,17 @@ describe('PlayerHomePage', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Correo pendiente');
     expect(fixture.nativeElement.textContent).toContain('Verificar mi correo');
+  });
+
+  it('highlights a running public game without inventing player hit counts', async () => {
+    const { fixture } = await renderPage();
+
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Juego en vivo');
+    expect(text).toContain('Último número sorteado: 11');
+    expect(text).toContain('Ver mis cartones');
+    expect(text).not.toContain('Aciertos:');
   });
 
   it('shows an honest empty state when there is no player activity', async () => {

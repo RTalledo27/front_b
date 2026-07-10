@@ -10,6 +10,26 @@ export interface PublicGameSchedule {
   salesClosesAt: string | null;
   scheduledStartAt: string | null;
   drawIntervalSeconds: number;
+  nextDrawAt: string | null;
+}
+
+export interface PublicGameLifecycle {
+  startedAt: string | null;
+  pausedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface PublicGameLatestDraw {
+  sequence: number;
+  number: number;
+  drawnAt: string;
+}
+
+export interface PublicGameWinner {
+  number: number;
+  drawSequence: number;
+  hits: number;
+  wonAt: string;
 }
 
 export interface PublicGame {
@@ -24,6 +44,9 @@ export interface PublicGame {
   ticketPrice: Money;
   prize: Money;
   schedule: PublicGameSchedule;
+  lifecycle: PublicGameLifecycle;
+  latestDraw: PublicGameLatestDraw | null;
+  winner: PublicGameWinner | null;
 }
 
 export interface PageInfo {

@@ -42,7 +42,17 @@ import { GameNumberOption } from '../../models/game-number.models';
 
         @if (game.status !== 'sales_open') {
           <aside class="sales-notice" role="status">
-            La venta todavía no está abierta. Puedes revisar la distribución, pero no seleccionar.
+            <p><strong>{{ stateBannerTitle(game.status) }}</strong></p>
+            <p>{{ stateBannerMessage(game.status) }}</p>
+            @if (game.latestDraw; as latestDraw) {
+              <p>
+                Último número sorteado: {{ latestDraw.number }} en el sorteo #{{ latestDraw.sequence
+                }}.
+              </p>
+            }
+            @if (game.winner; as winner) {
+              <p>Ganó el número {{ winner.number }} con {{ winner.hits }} aciertos.</p>
+            }
           </aside>
         }
 
@@ -175,6 +185,8 @@ import { GameNumberOption } from '../../models/game-number.models';
     .availability { flex: none; padding: .7rem .9rem; border-radius: 999px; background: var(--color-brand-subtle); color: var(--color-brand-strong); font-size: var(--sm); font-weight: 800; }
     .sales-notice, .refresh-notice, .feedback { margin-bottom: var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--color-border); border-radius: var(--r-md); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--sm); }
     .sales-notice { border-left: 4px solid var(--color-prize-strong); background: var(--color-prize-subtle); color: var(--color-neutral-800); }
+    .sales-notice p { margin: 0; }
+    .sales-notice p + p { margin-top: var(--s1); }
     .refresh-notice { border-left: 4px solid var(--color-brand); }
     .feedback { border-left: 4px solid var(--color-neutral-500); }
     .feedback p { margin: 0; }
@@ -272,5 +284,31 @@ export class NumberSelectionPage {
       this.facade.reservationStatus() === 'forbidden' &&
       (error.code === 'email_not_verified' || error.reason === 'email_not_verified')
     );
+  }
+
+  stateBannerTitle(status: string): string {
+    switch (status) {
+      case 'sales_closed':
+        return 'Ventas cerradas';
+      case 'running':
+        return 'Juego en vivo';
+      case 'completed':
+        return 'Juego finalizado';
+      default:
+        return 'Participación no disponible';
+    }
+  }
+
+  stateBannerMessage(status: string): string {
+    switch (status) {
+      case 'sales_closed':
+        return 'La reserva ya no está habilitada. El backend prepara el inicio operativo del juego.';
+      case 'running':
+        return 'Este tablero ya no funciona como compra. El juego está corriendo y la reserva quedó cerrada.';
+      case 'completed':
+        return 'Este juego terminó. Conservamos la grilla como referencia pública, sin habilitar nuevas acciones.';
+      default:
+        return 'Puedes revisar la distribución, pero todavía no corresponde reservar.';
+    }
   }
 }

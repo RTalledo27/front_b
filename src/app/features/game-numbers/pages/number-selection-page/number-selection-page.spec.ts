@@ -4,6 +4,34 @@ import { ActivatedRoute } from '@angular/router';
 import { ApiError } from '../../../../core/api/models/api-error.models';
 import { NumberSelectionFacade } from '../../data-access/number-selection.facade';
 import { NumberSelectionPage } from './number-selection-page';
+import { PublicGame } from '../../../public-games/models/public-game.models';
+
+const baseGame: PublicGame = {
+  id: '01977abc-0000-7000-8000-000000000001',
+  slug: 'bingo-fortuna',
+  name: 'Bingo Fortuna',
+  description: null,
+  status: 'sales_open',
+  numberMin: 1,
+  numberMax: 3,
+  hitsRequired: 3,
+  ticketPrice: { amountCents: 500, currency: 'PEN' },
+  prize: { amountCents: 10000, currency: 'PEN' },
+  schedule: {
+    salesOpensAt: null,
+    salesClosesAt: null,
+    scheduledStartAt: null,
+    drawIntervalSeconds: 10,
+    nextDrawAt: null,
+  },
+  lifecycle: {
+    startedAt: null,
+    pausedAt: null,
+    completedAt: null,
+  },
+  latestDraw: null,
+  winner: null,
+};
 
 function createFacadeMock() {
   return {
@@ -12,24 +40,7 @@ function createFacadeMock() {
     clearSelection: vi.fn(),
     submitReservation: vi.fn(),
     isSelected: vi.fn((key: string) => key === '01977abc-0000-7000-8000-000000000011'),
-    game: signal({
-      id: '01977abc-0000-7000-8000-000000000001',
-      slug: 'bingo-fortuna',
-      name: 'Bingo Fortuna',
-      description: null,
-      status: 'sales_open' as const,
-      numberMin: 1,
-      numberMax: 3,
-      hitsRequired: 3,
-      ticketPrice: { amountCents: 500, currency: 'PEN' },
-      prize: { amountCents: 10000, currency: 'PEN' },
-      schedule: {
-        salesOpensAt: null,
-        salesClosesAt: null,
-        scheduledStartAt: null,
-        drawIntervalSeconds: 10,
-      },
-    }),
+    game: signal<PublicGame>(baseGame),
     numbers: signal([
       {
         key: '01977abc-0000-7000-8000-000000000011',
@@ -230,5 +241,39 @@ describe('NumberSelectionPage', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Necesitas verificar tu correo antes de reservar números reales.');
     expect(fixture.nativeElement.textContent).toContain('Verificar mi correo');
+  });
+
+  it('explains that the board is no longer a purchase flow once the game is already running', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      status: 'running',
+      latestDraw: {
+        sequence: 3,
+        number: 17,
+        drawnAt: '2026-06-21T21:00:24Z',
+      },
+    });
+    facade.selectionEnabled.set(false);
+    facade.canReserve.set(false);
+
+    await TestBed.configureTestingModule({
+      imports: [NumberSelectionPage],
+      providers: [
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['slug', 'bingo-fortuna']]) } } },
+      ],
+    })
+      .overrideComponent(NumberSelectionPage, {
+        set: { providers: [{ provide: NumberSelectionFacade, useValue: facade }] },
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(NumberSelectionPage);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Juego en vivo');
+    expect(text).toContain('ya no funciona como compra');
+    expect(text).toContain('Último número sorteado: 17');
   });
 });

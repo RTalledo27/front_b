@@ -211,3 +211,57 @@
   color: var(--color-link-hover);
   text-decoration: underline;
 }
+.live-state {
+  display: grid;
+  gap: var(--s4);
+}
+.live-state__heading {
+  align-items: flex-start;
+}
+.live-pill {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--xs);
+  font-weight: 750;
+}
+.live-highlight,
+.winner-card {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s4);
+  border-radius: var(--r-lg);
+  background: var(--color-surface-subtle);
+}
+.live-highlight span,
+.winner-card small,
+.live-inline-error {
+  color: var(--color-text-muted);
+}
+.live-highlight strong {
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  line-height: 1;
+}
+.live-facts {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+}
+.live-facts dt {
+  color: var(--color-text-muted);
+  font-size: var(--sm);
+}
+.live-facts dd {
+  margin: var(--s1) 0 0;
+  font-weight: 750;
+}
+.winner-card h3,
+.winner-card p,
+.live-inline-error {
+  margin: 0;
+}
+.winner-card--muted {
+  border: 1px dashed var(--color-border);
+  background: transparent;
+}

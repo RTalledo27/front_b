@@ -16,6 +16,69 @@ import {
   PlayerCommerceRepository,
 } from '../../player-commerce/data-access/player-commerce.repository';
 import { PlayerHomeFacade } from './player-home.facade';
+import {
+  PUBLIC_GAMES_REPOSITORY,
+  PublicGamesRepository,
+} from '../../public-games/data-access/public-games.repository';
+import { PublicGame } from '../../public-games/models/public-game.models';
+
+const runningGame: PublicGame = {
+  id: 'game-1',
+  slug: 'bingo-real',
+  name: 'Bingo Real',
+  description: null,
+  status: 'running',
+  numberMin: 1,
+  numberMax: 90,
+  hitsRequired: 5,
+  ticketPrice: { amountCents: 500, currency: 'PEN' },
+  prize: { amountCents: 10000, currency: 'PEN' },
+  schedule: {
+    salesOpensAt: null,
+    salesClosesAt: null,
+    scheduledStartAt: '2026-07-05T12:00:00Z',
+    drawIntervalSeconds: 8,
+    nextDrawAt: '2026-07-05T12:00:08Z',
+  },
+  lifecycle: {
+    startedAt: '2026-07-05T12:00:00Z',
+    pausedAt: null,
+    completedAt: null,
+  },
+  latestDraw: {
+    sequence: 3,
+    number: 17,
+    drawnAt: '2026-07-05T12:00:24Z',
+  },
+  winner: null,
+};
+
+const completedGame: PublicGame = {
+  ...runningGame,
+  id: 'game-9',
+  slug: 'fortuna-final',
+  name: 'Fortuna Final',
+  status: 'completed',
+  schedule: {
+    ...runningGame.schedule,
+    nextDrawAt: null,
+  },
+  lifecycle: {
+    ...runningGame.lifecycle,
+    completedAt: '2026-07-05T12:10:00Z',
+  },
+  latestDraw: {
+    sequence: 9,
+    number: 19,
+    drawnAt: '2026-07-05T12:10:00Z',
+  },
+  winner: {
+    number: 19,
+    drawSequence: 9,
+    hits: 5,
+    wonAt: '2026-07-05T12:10:00Z',
+  },
+};
 
 describe('PlayerHomeFacade', () => {
   function createUser(): AuthUser {
@@ -169,8 +232,18 @@ describe('PlayerHomeFacade', () => {
     };
   }
 
-  async function configureFacade(overrides?: Partial<PlayerCommerceRepository>) {
+  async function configureFacade(
+    overrides?: Partial<PlayerCommerceRepository>,
+    publicGamesOverrides?: Partial<PublicGamesRepository>,
+  ) {
     const repository = createRepository(overrides);
+    const publicGamesRepository: PublicGamesRepository = {
+      list: vi.fn(),
+      getBySlug: vi.fn((slug: string) =>
+        of(slug === 'bingo-real' ? runningGame : completedGame),
+      ),
+      ...publicGamesOverrides,
+    };
     const session = {
       user: signal<AuthUser | null>(createUser()),
     };
@@ -179,6 +252,7 @@ describe('PlayerHomeFacade', () => {
       providers: [
         PlayerHomeFacade,
         { provide: PLAYER_COMMERCE_REPOSITORY, useValue: repository },
+        { provide: PUBLIC_GAMES_REPOSITORY, useValue: publicGamesRepository },
         { provide: AuthSessionService, useValue: session },
       ],
     }).compileComponents();
@@ -186,6 +260,7 @@ describe('PlayerHomeFacade', () => {
     return {
       facade: TestBed.inject(PlayerHomeFacade),
       repository,
+      publicGamesRepository,
       session,
     };
   }
@@ -198,7 +273,7 @@ describe('PlayerHomeFacade', () => {
   }
 
   it('loads a real composed home with totals from Laravel pagination metadata', async () => {
-    const { facade, repository } = await configureFacade();
+    const { facade, repository, publicGamesRepository } = await configureFacade();
 
     facade.load();
 
@@ -212,6 +287,7 @@ describe('PlayerHomeFacade', () => {
     expect(facade.latestOrder()?.id).toBe('order-1');
     expect(facade.latestReservation()?.gameNumber.number).toBe(7);
     expect(facade.latestEntry()?.game?.name).toBe('Fortuna Final');
+    expect(publicGamesRepository.getBySlug).toHaveBeenCalled();
   });
 
   it('shows an honest empty state when the three player endpoints return zero records', async () => {
@@ -243,6 +319,16 @@ describe('PlayerHomeFacade', () => {
     expect(facade.reservationsStatus()).toBe('networkError');
     expect(facade.entriesStatus()).toBe('loaded');
     expect(facade.failedSections()).toEqual(['reservas']);
+  });
+
+  it('composes live public game state for entries and reservations without inventing hits', async () => {
+    const { facade } = await configureFacade();
+
+    facade.load();
+
+    expect(facade.runningGames()).toHaveLength(1);
+    expect(facade.gameLiveState('game-1')?.latestDraw?.number).toBe(17);
+    expect(facade.gameLiveState('game-9')?.status).toBe('completed');
   });
 
   it('reports a full unauthorized state when the three endpoints require a valid session', async () => {
