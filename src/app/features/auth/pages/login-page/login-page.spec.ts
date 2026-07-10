@@ -177,6 +177,20 @@ describe('LoginPage', () => {
     expect(fixture.nativeElement.textContent).toContain('No pudimos abrir tu sesión.');
   });
 
+  it('handles cancelled redirects without leaving the login button loading', async () => {
+    vi.spyOn(router, 'navigateByUrl').mockResolvedValueOnce(false);
+    session.login.mockReturnValue(of(player));
+    const fixture = TestBed.createComponent(LoginPage);
+    fillValidForm(fixture);
+
+    fixture.componentInstance.submit();
+    await flushNavigation();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.submitting()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('No pudimos abrir tu sesión.');
+  });
+
   it('blocks double submit while the first login is pending', () => {
     const loginResult = new Subject<AuthUser>();
     session.login.mockReturnValue(loginResult.asObservable());

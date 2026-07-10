@@ -248,6 +248,24 @@ describe('AuthSessionService', () => {
     await expect(second).resolves.toMatchObject({ id: 7 });
   });
 
+  it('releases the pending me request after a non-auth failure so recovery can retry', async () => {
+    storage.write('plain-text-token');
+
+    const firstAttempt = firstValueFrom(service.ensureSession());
+    http
+      .expectOne(`${apiBaseUrl}/auth/me`)
+      .flush({ message: 'Server error' }, { status: 500, statusText: 'Server Error' });
+
+    await expect(firstAttempt).rejects.toMatchObject({ status: 500 });
+    expect(service.status()).toBe('error');
+
+    const secondAttempt = firstValueFrom(service.ensureSession());
+    http.expectOne(`${apiBaseUrl}/auth/me`).flush({ data: userDto });
+
+    await expect(secondAttempt).resolves.toMatchObject({ id: 7 });
+    expect(service.status()).toBe('authenticated');
+  });
+
   it('logs out successfully and clears local state', async () => {
     const loginPromise = firstValueFrom(
       service.login({ email: 'admin@example.com', password: 'secret123' }),
