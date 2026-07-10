@@ -40,24 +40,32 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
 
       @if (facade.status() === 'idle') {
         <section class="surface-card data-state">
-          <h2>Abre esta consola desde un bingo real</h2>
+          <h2>Abre esta consola desde el detalle de un bingo real</h2>
           <p>
-            La experiencia principal vive en el detalle administrativo del juego. El acceso manual por
-            UUID queda solo como diagnóstico técnico secundario.
+            El flujo principal vive en <code>/admin/bingos/:gameId</code>, donde ya viaja el contexto
+            real del juego. Este acceso técnico existe solo para soporte o diagnóstico puntual.
           </p>
 
-          <form class="manual-form" (ngSubmit)="openManualContext()">
-            <label for="manual-game-id">UUID del juego para diagnóstico opcional</label>
+          <div class="empty-actions">
+            <a class="button" routerLink="/admin/bingos">Ir al listado de bingos</a>
+            <p class="technical-hint">
+              Si necesitas revisar un UUID específico fuera del flujo principal, puedes abrir un
+              contexto técnico secundario aquí abajo.
+            </p>
+          </div>
+
+          <form class="manual-form manual-form--secondary" (ngSubmit)="openManualContext()">
+            <label for="manual-game-id">UUID del juego para diagnóstico técnico opcional</label>
             <input
               id="manual-game-id"
               [formControl]="manualGameId"
               placeholder="UUID real del juego"
               autocomplete="off"
             />
-            <button class="button" type="submit" [disabled]="manualDisabled()">Abrir contexto técnico</button>
+            <button class="button button--secondary" type="submit" [disabled]="manualDisabled()">
+              Abrir contexto técnico
+            </button>
           </form>
-
-          <a class="button button--secondary" routerLink="/admin/bingos">Ir al listado de bingos</a>
         </section>
       } @else if (facade.status() === 'loading' || facade.status() === 'refreshing') {
         <section class="surface-card data-state" aria-busy="true" aria-live="polite">
@@ -114,6 +122,11 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
             <p class="eyebrow">UUID real {{ snapshot.context.id }}</p>
             <h2>{{ snapshot.context.name }}</h2>
             <p>{{ snapshot.context.description || 'Sin descripción administrativa registrada.' }}</p>
+            <dl class="hero-meta">
+              <div><dt>Slug</dt><dd>{{ snapshot.context.slug }}</dd></div>
+              <div><dt>Estado</dt><dd>{{ snapshot.context.status.label }}</dd></div>
+              <div><dt>Acceso</dt><dd>{{ accessModeLabel() }}</dd></div>
+            </dl>
           </div>
           <app-status-badge [tone]="snapshot.context.status.tone">
             {{ snapshot.context.status.label }}
@@ -496,7 +509,10 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
             <div class="panel-header">
               <div>
                 <h3>Historial de extracciones</h3>
-                <p>{{ snapshot.draws.length }} registros cargados desde el endpoint admin real.</p>
+                <p>
+                  Mostrando {{ snapshot.draws.length }} de {{ snapshot.drawsPageInfo.total }}
+                  registros del endpoint admin real.
+                </p>
               </div>
             </div>
 
@@ -510,6 +526,33 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
                   </article>
                 }
               </div>
+              @if (snapshot.drawsPageInfo.lastPage > 1) {
+                <nav class="pager" aria-label="Paginación de extracciones">
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="snapshot.drawsPageInfo.currentPage === 1 || facade.status() === 'refreshing'"
+                    (click)="facade.loadDrawsPage(snapshot.drawsPageInfo.currentPage - 1)"
+                  >
+                    Anterior
+                  </button>
+                  <span>
+                    Página {{ snapshot.drawsPageInfo.currentPage }} de
+                    {{ snapshot.drawsPageInfo.lastPage }}
+                  </span>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="
+                      snapshot.drawsPageInfo.currentPage >= snapshot.drawsPageInfo.lastPage ||
+                      facade.status() === 'refreshing'
+                    "
+                    (click)="facade.loadDrawsPage(snapshot.drawsPageInfo.currentPage + 1)"
+                  >
+                    Siguiente
+                  </button>
+                </nav>
+              }
             } @else {
               <p class="empty-copy">Este juego no tiene draws administrativos aún.</p>
             }
@@ -519,7 +562,10 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
             <div class="panel-header">
               <div>
                 <h3>Contadores por número</h3>
-                <p>{{ snapshot.counters.length }} filas cargadas desde el endpoint admin real.</p>
+                <p>
+                  Mostrando {{ snapshot.counters.length }} de {{ snapshot.countersPageInfo.total }}
+                  filas del endpoint admin real.
+                </p>
               </div>
             </div>
 
@@ -544,6 +590,33 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
                   </article>
                 }
               </div>
+              @if (snapshot.countersPageInfo.lastPage > 1) {
+                <nav class="pager" aria-label="Paginación de counters">
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="snapshot.countersPageInfo.currentPage === 1 || facade.status() === 'refreshing'"
+                    (click)="facade.loadCountersPage(snapshot.countersPageInfo.currentPage - 1)"
+                  >
+                    Anterior
+                  </button>
+                  <span>
+                    Página {{ snapshot.countersPageInfo.currentPage }} de
+                    {{ snapshot.countersPageInfo.lastPage }}
+                  </span>
+                  <button
+                    class="button button--secondary"
+                    type="button"
+                    [disabled]="
+                      snapshot.countersPageInfo.currentPage >= snapshot.countersPageInfo.lastPage ||
+                      facade.status() === 'refreshing'
+                    "
+                    (click)="facade.loadCountersPage(snapshot.countersPageInfo.currentPage + 1)"
+                  >
+                    Siguiente
+                  </button>
+                </nav>
+              }
             } @else {
               <p class="empty-copy">No hay counters administrativos para mostrar todavía.</p>
             }
@@ -571,6 +644,21 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       min-width: 0;
       max-width: 34rem;
       margin: var(--s4) 0;
+    }
+    .manual-form--secondary {
+      padding-top: var(--s4);
+      border-top: 1px dashed var(--color-border);
+    }
+    .empty-actions {
+      display: grid;
+      gap: var(--s3);
+      justify-items: start;
+    }
+    .technical-hint {
+      margin: 0;
+      max-width: 50rem;
+      color: var(--color-text-muted);
+      overflow-wrap: anywhere;
     }
     label {
       font-weight: 700;
@@ -629,6 +717,22 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
     .start-panel {
       display: grid;
       gap: var(--s3);
+    }
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s3);
+      margin: var(--s4) 0 0;
+    }
+    .hero-meta div {
+      padding: var(--s3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-md);
+      background: var(--neutral-50);
+    }
+    .hero-meta dd {
+      margin-top: .25rem;
+      text-align: left;
     }
     .technical-panel {
       display: grid;
@@ -751,6 +855,19 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       padding: .75rem 0;
       border-bottom: 1px solid var(--color-border);
     }
+    .pager {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s3);
+      margin-top: var(--s4);
+    }
+    .pager span {
+      color: var(--color-text-muted);
+      font-size: var(--sm);
+      font-weight: 700;
+    }
     .counter-number {
       display: flex;
       align-items: center;
@@ -759,7 +876,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
     }
     @media (max-width: 64rem) {
       .summary-grid,
-      .audit-grid {
+      .audit-grid,
+      .hero-meta {
         grid-template-columns: 1fr;
       }
     }
@@ -771,7 +889,8 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       .start-panel__header,
       .technical-panel__header,
       .command-actions,
-      .technical-actions {
+      .technical-actions,
+      .pager {
         grid-template-columns: 1fr;
         display: grid;
       }
@@ -954,6 +1073,12 @@ export class GameEnginePage {
     }
 
     this.router.navigate(['/admin/motor'], { queryParams: { gameId } });
+  }
+
+  accessModeLabel(): string {
+    return this.facade.accessMode() === 'manual'
+      ? 'Acceso técnico secundario'
+      : 'Flujo principal desde detalle admin';
   }
 
   openStartConfirmation(): void {

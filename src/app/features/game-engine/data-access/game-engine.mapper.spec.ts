@@ -25,10 +25,10 @@ describe('game-engine.mapper', () => {
         },
       ],
       links: { first: null, last: null, prev: null, next: null },
-      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '', per_page: 100, to: 1, total: 1 },
+      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '/draws', per_page: 50, to: 1, total: 1 },
     });
 
-    expect(result).toEqual([
+    expect(result.items).toEqual([
       {
         id: 'draw-1',
         gameId: 'game-1',
@@ -39,6 +39,8 @@ describe('game-engine.mapper', () => {
         drawnAt: '2026-06-27T12:00:00Z',
       },
     ]);
+    expect(result.pageInfo).toMatchObject({ currentPage: 1, lastPage: 1, perPage: 50, total: 1 });
+    expect(result.links.next).toBeNull();
   });
 
   it('maps the admin counters listing contract with known status labels', () => {
@@ -53,16 +55,17 @@ describe('game-engine.mapper', () => {
         },
       ],
       links: { first: null, last: null, prev: null, next: null },
-      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '', per_page: 100, to: 1, total: 1 },
+      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '/counters', per_page: 50, to: 1, total: 1 },
     });
 
-    expect(result[0]).toMatchObject({
+    expect(result.items[0]).toMatchObject({
       gameNumberId: 'number-7',
       number: 33,
       hitsCount: 2,
       lastDrawSequence: 9,
       status: { value: 'reserved', label: 'Reservado', tone: 'warning', isKnown: true },
     });
+    expect(result.pageInfo.path).toBe('/counters');
   });
 
   it('maps the winner resource envelope', () => {

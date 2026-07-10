@@ -9,6 +9,8 @@ import { GameEnginePage } from './game-engine-page';
 function createFacadeMock() {
   return {
     load: vi.fn(),
+    loadDrawsPage: vi.fn(),
+    loadCountersPage: vi.fn(),
     refresh: vi.fn(),
     clear: vi.fn(),
     startGame: vi.fn(),
@@ -65,7 +67,27 @@ function createFacadeMock() {
         createdAt: '2026-06-27T11:00:00Z',
       },
       draws: [],
+      drawsPageInfo: {
+        currentPage: 1,
+        from: null,
+        lastPage: 1,
+        path: '/api/v1/admin/games/game-1/draws',
+        perPage: 50,
+        to: null,
+        total: 0,
+      },
+      drawsLinks: { first: null, last: null, prev: null, next: null },
       counters: [],
+      countersPageInfo: {
+        currentPage: 1,
+        from: null,
+        lastPage: 1,
+        path: '/api/v1/admin/games/game-1/counters',
+        perPage: 50,
+        to: null,
+        total: 0,
+      },
+      countersLinks: { first: null, last: null, prev: null, next: null },
       winner: null,
     }),
     status: signal<
@@ -230,6 +252,8 @@ describe('GameEnginePage', () => {
     expect(facade.load).toHaveBeenCalledWith('game-1', 'contextual');
     expect(text).toContain('Bingo Central');
     expect(text).toContain('Iniciar juego');
+    expect(text).toContain('bingo-central');
+    expect(text).toContain('Flujo principal desde detalle admin');
     expect(text).not.toContain('Pausar juego');
     expect(text).not.toContain('Reanudar juego');
     expect(text).not.toContain('Sortear número');
@@ -636,6 +660,88 @@ describe('GameEnginePage', () => {
     const fixture = await renderPage(facade, '');
 
     expect(facade.clear).toHaveBeenCalled();
-    expect(fixture.nativeElement.textContent).toContain('diagnóstico técnico secundario');
+    expect(fixture.nativeElement.textContent).toContain('flujo principal vive en');
+    expect(fixture.nativeElement.textContent).toContain('diagnóstico técnico opcional');
+  });
+
+  it('renders draws pagination controls when Laravel exposes more than one page', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      draws: [
+        {
+          id: 'draw-1',
+          gameId: 'game-1',
+          gameNumberId: 'number-1',
+          sequence: 1,
+          drawnNumber: 7,
+          strategy: 'manual',
+          drawnAt: '2026-06-27T12:00:00Z',
+        },
+      ],
+      drawsPageInfo: {
+        currentPage: 2,
+        from: 51,
+        lastPage: 3,
+        path: '/api/v1/admin/games/game-1/draws',
+        perPage: 50,
+        to: 51,
+        total: 101,
+      },
+      drawsLinks: { first: '?page=1', last: '?page=3', prev: '?page=1', next: '?page=3' },
+    });
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+    const pagerButtons = Array.from(fixture.nativeElement.querySelectorAll('.pager button'));
+
+    expect(text).toContain('Mostrando 1 de 101');
+    expect(text).toContain('Página 2 de 3');
+
+    (pagerButtons[0] as HTMLButtonElement | undefined)?.click();
+    (pagerButtons[1] as HTMLButtonElement | undefined)?.click();
+
+    expect(facade.loadDrawsPage).toHaveBeenNthCalledWith(1, 1);
+    expect(facade.loadDrawsPage).toHaveBeenNthCalledWith(2, 3);
+  });
+
+  it('renders counters pagination controls when Laravel exposes more than one page', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      counters: [
+        {
+          gameNumberId: 'number-2',
+          number: 18,
+          status: { value: 'available', label: 'Disponible', tone: 'success', isKnown: true },
+          hitsCount: 0,
+          lastDrawSequence: null,
+        },
+      ],
+      countersPageInfo: {
+        currentPage: 2,
+        from: 51,
+        lastPage: 4,
+        path: '/api/v1/admin/games/game-1/counters',
+        perPage: 50,
+        to: 51,
+        total: 180,
+      },
+      countersLinks: { first: '?page=1', last: '?page=4', prev: '?page=1', next: '?page=3' },
+    });
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+    const pager = fixture.nativeElement.querySelector('.pager') as HTMLElement;
+    const counterPagerButtons = Array.from(pager.querySelectorAll('button'));
+
+    expect(text).toContain('Mostrando 1 de 180');
+    expect(text).toContain('Página 2 de 4');
+
+    (counterPagerButtons[0] as HTMLButtonElement | undefined)?.click();
+    (counterPagerButtons[1] as HTMLButtonElement | undefined)?.click();
+
+    expect(facade.loadCountersPage).toHaveBeenNthCalledWith(1, 1);
+    expect(facade.loadCountersPage).toHaveBeenNthCalledWith(2, 3);
   });
 });

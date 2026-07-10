@@ -6,8 +6,12 @@ import {
 import { buildAdminGameNumberStatus } from '../../admin-games/utils/admin-games-display';
 import {
   GameEngineCounterView,
+  GameEngineCountersPageView,
   GameEngineDrawCommandView,
   GameEngineDrawView,
+  GameEngineDrawsPageView,
+  GameEnginePageInfo,
+  GameEnginePaginationLinks,
   GameEnginePauseCommandView,
   GameEngineRebuildCountersCommandView,
   GameEngineResumeCommandView,
@@ -17,20 +21,28 @@ import {
 
 const INVALID_PAYLOAD_ERROR = 'invalid_game_engine_payload';
 
-export function mapGameEngineDrawsResponse(response: unknown): GameEngineDrawView[] {
+export function mapGameEngineDrawsResponse(response: unknown): GameEngineDrawsPageView {
   if (!isPaginatedResponse(response)) {
     throw new Error(INVALID_PAYLOAD_ERROR);
   }
 
-  return response.data.map(mapGameEngineDraw);
+  return {
+    items: response.data.map(mapGameEngineDraw),
+    pageInfo: mapPageInfo(response.meta),
+    links: mapPaginationLinks(response.links),
+  };
 }
 
-export function mapGameEngineCountersResponse(response: unknown): GameEngineCounterView[] {
+export function mapGameEngineCountersResponse(response: unknown): GameEngineCountersPageView {
   if (!isPaginatedResponse(response)) {
     throw new Error(INVALID_PAYLOAD_ERROR);
   }
 
-  return response.data.map(mapGameEngineCounter);
+  return {
+    items: response.data.map(mapGameEngineCounter),
+    pageInfo: mapPageInfo(response.meta),
+    links: mapPaginationLinks(response.links),
+  };
 }
 
 export function mapGameEngineWinnerResponse(response: unknown): GameEngineWinnerView {
@@ -233,6 +245,27 @@ function mapGameEngineRebuildCounters(payload: unknown): GameEngineRebuildCounte
     totalDraws: readNonNegativeNumber(record['total_draws']),
     maxSequence: readNonNegativeNumber(record['max_sequence']),
     rebuiltAt: readIsoDate(record['rebuilt_at']),
+  };
+}
+
+function mapPageInfo(meta: LaravelPaginationMeta): GameEnginePageInfo {
+  return {
+    currentPage: readNumber(meta['current_page']),
+    from: readNullableNumber(meta['from']),
+    lastPage: readNumber(meta['last_page']),
+    path: readString(meta['path']),
+    perPage: readNumber(meta['per_page']),
+    to: readNullableNumber(meta['to']),
+    total: readNumber(meta['total']),
+  };
+}
+
+function mapPaginationLinks(value: LaravelPaginatedResponse<unknown>['links']): GameEnginePaginationLinks {
+  return {
+    first: readNullableString(value['first']),
+    last: readNullableString(value['last']),
+    prev: readNullableString(value['prev']),
+    next: readNullableString(value['next']),
   };
 }
 

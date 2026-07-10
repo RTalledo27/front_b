@@ -9,7 +9,11 @@ import { ADMIN_GAMES_REPOSITORY } from '../../admin-games/data-access/admin-game
 import {
   GameEngineAccessMode,
   GameEngineConsoleView,
+  GameEngineCounterView,
+  GameEngineCountersPageView,
   GameEngineDrawCommandView,
+  GameEngineDrawView,
+  GameEngineDrawsPageView,
   GameEngineDrawStatus,
   GameEnginePauseCommandView,
   GameEnginePauseStatus,
@@ -25,6 +29,23 @@ import {
 import { DrawCommandIdService } from './draw-command-id.service';
 import { GAME_ENGINE_REPOSITORY } from './game-engine.repository';
 
+const FALLBACK_PAGE_INFO = {
+  currentPage: 1,
+  from: null,
+  lastPage: 1,
+  path: '',
+  perPage: 50,
+  to: null,
+  total: 0,
+} as const;
+
+const FALLBACK_LINKS = {
+  first: null,
+  last: null,
+  prev: null,
+  next: null,
+} as const;
+
 @Injectable()
 export class GameEngineFacade {
   private readonly adminGamesRepository = inject(ADMIN_GAMES_REPOSITORY);
@@ -35,6 +56,8 @@ export class GameEngineFacade {
 
   private loadSequence = 0;
   private activeGameId = '';
+  private activeDrawsPage = 1;
+  private activeCountersPage = 1;
   private startSequence = 0;
   private pauseSequence = 0;
   private resumeSequence = 0;
@@ -61,7 +84,11 @@ export class GameEngineFacade {
   readonly rebuildError = signal<ApiError | null>(null);
   readonly rebuildResult = signal<GameEngineRebuildCountersCommandView | null>(null);
 
-  load(gameId: string, accessMode: GameEngineAccessMode): void {
+  load(
+    gameId: string,
+    accessMode: GameEngineAccessMode,
+    pages?: { drawsPage?: number; countersPage?: number },
+  ): void {
     const normalizedGameId = gameId.trim();
     if (normalizedGameId === '') {
       this.clear();
@@ -70,12 +97,18 @@ export class GameEngineFacade {
 
     const isGameChanged = normalizedGameId !== this.activeGameId;
     const hasLoadedSnapshot = this.snapshot()?.context.id === normalizedGameId;
+    const nextDrawsPage = sanitizePage(pages?.drawsPage ?? (isGameChanged ? 1 : this.activeDrawsPage));
+    const nextCountersPage = sanitizePage(
+      pages?.countersPage ?? (isGameChanged ? 1 : this.activeCountersPage),
+    );
 
     if (isGameChanged) {
       this.resetCommandState();
     }
 
     this.activeGameId = normalizedGameId;
+    this.activeDrawsPage = nextDrawsPage;
+    this.activeCountersPage = nextCountersPage;
     this.loadSequence += 1;
     this.accessMode.set(accessMode);
     this.error.set(null);
@@ -90,8 +123,8 @@ export class GameEngineFacade {
 
     forkJoin({
       context: this.adminGamesRepository.getGame(normalizedGameId),
-      draws: this.repository.listDraws(normalizedGameId),
-      counters: this.repository.listCounters(normalizedGameId),
+      draws: this.repository.listDraws(normalizedGameId, nextDrawsPage),
+      counters: this.repository.listCounters(normalizedGameId, nextCountersPage),
       winner: this.loadWinnerOrNull(normalizedGameId),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -101,7 +134,18 @@ export class GameEngineFacade {
             return;
           }
 
-          this.snapshot.set({ context, draws, counters, winner });
+          const normalizedDraws = normalizeDrawsPage(draws);
+          const normalizedCounters = normalizeCountersPage(counters);
+          this.snapshot.set({
+            context,
+            draws: normalizedDraws.items,
+            drawsPageInfo: normalizedDraws.pageInfo,
+            drawsLinks: normalizedDraws.links,
+            counters: normalizedCounters.items,
+            countersPageInfo: normalizedCounters.pageInfo,
+            countersLinks: normalizedCounters.links,
+            winner,
+          });
           this.error.set(null);
           this.status.set('loaded');
         },
@@ -120,12 +164,49 @@ export class GameEngineFacade {
 
   refresh(): void {
     if (this.activeGameId !== '') {
-      this.load(this.activeGameId, this.accessMode());
+      this.load(this.activeGameId, this.accessMode(), {
+        drawsPage: this.activeDrawsPage,
+        countersPage: this.activeCountersPage,
+      });
     }
+  }
+
+  loadDrawsPage(page: number): void {
+    if (this.activeGameId === '') {
+      return;
+    }
+
+    const targetPage = sanitizePage(page);
+    if (targetPage === this.activeDrawsPage) {
+      return;
+    }
+
+    this.load(this.activeGameId, this.accessMode(), {
+      drawsPage: targetPage,
+      countersPage: this.activeCountersPage,
+    });
+  }
+
+  loadCountersPage(page: number): void {
+    if (this.activeGameId === '') {
+      return;
+    }
+
+    const targetPage = sanitizePage(page);
+    if (targetPage === this.activeCountersPage) {
+      return;
+    }
+
+    this.load(this.activeGameId, this.accessMode(), {
+      drawsPage: this.activeDrawsPage,
+      countersPage: targetPage,
+    });
   }
 
   clear(): void {
     this.activeGameId = '';
+    this.activeDrawsPage = 1;
+    this.activeCountersPage = 1;
     this.loadSequence += 1;
     this.startSequence += 1;
     this.pauseSequence += 1;
@@ -441,6 +522,40 @@ export class GameEngineFacade {
   private canSubmitCommand(status: 'idle' | 'submitting' | 'success' | 'conflict' | 'unauthorized' | 'forbidden' | 'notFound' | 'invalidState' | 'networkError' | 'unexpectedError'): boolean {
     return this.activeGameId !== '' && status !== 'submitting';
   }
+}
+
+function sanitizePage(page: number): number {
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeDrawsPage(draws: GameEngineDrawsPageView | GameEngineDrawView[]): GameEngineDrawsPageView {
+  if (Array.isArray(draws)) {
+    return {
+      items: draws,
+      pageInfo: { ...FALLBACK_PAGE_INFO, total: draws.length, to: draws.length === 0 ? null : draws.length },
+      links: FALLBACK_LINKS,
+    };
+  }
+
+  return draws;
+}
+
+function normalizeCountersPage(
+  counters: GameEngineCountersPageView | GameEngineCounterView[],
+): GameEngineCountersPageView {
+  if (Array.isArray(counters)) {
+    return {
+      items: counters,
+      pageInfo: {
+        ...FALLBACK_PAGE_INFO,
+        total: counters.length,
+        to: counters.length === 0 ? null : counters.length,
+      },
+      links: FALLBACK_LINKS,
+    };
+  }
+
+  return counters;
 }
 
 function resolveGameEngineStatus(error: ApiError): GameEnginePageStatus {

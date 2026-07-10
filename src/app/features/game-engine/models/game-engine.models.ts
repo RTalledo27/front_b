@@ -83,10 +83,43 @@ export interface GameEngineRebuildCountersCommandView {
   rebuiltAt: string;
 }
 
+export interface GameEnginePageInfo {
+  currentPage: number;
+  from: number | null;
+  lastPage: number;
+  path: string;
+  perPage: number;
+  to: number | null;
+  total: number;
+}
+
+export interface GameEnginePaginationLinks {
+  first: string | null;
+  last: string | null;
+  prev: string | null;
+  next: string | null;
+}
+
+export interface GameEngineDrawsPageView {
+  items: GameEngineDrawView[];
+  pageInfo: GameEnginePageInfo;
+  links: GameEnginePaginationLinks;
+}
+
+export interface GameEngineCountersPageView {
+  items: GameEngineCounterView[];
+  pageInfo: GameEnginePageInfo;
+  links: GameEnginePaginationLinks;
+}
+
 export interface GameEngineConsoleView {
   context: AdminGameDetailView;
   draws: GameEngineDrawView[];
+  drawsPageInfo: GameEnginePageInfo;
+  drawsLinks: GameEnginePaginationLinks;
   counters: GameEngineCounterView[];
+  countersPageInfo: GameEnginePageInfo;
+  countersLinks: GameEnginePaginationLinks;
   winner: GameEngineWinnerView | null;
 }
 

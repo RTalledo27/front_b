@@ -8,8 +8,10 @@ import {
 } from '../../../core/api/models/api-response.models';
 import {
   GameEngineCounterView,
+  GameEngineCountersPageView,
   GameEngineDrawCommandView,
   GameEngineDrawView,
+  GameEngineDrawsPageView,
   GameEnginePauseCommandView,
   GameEngineRebuildCountersCommandView,
   GameEngineResumeCommandView,
@@ -28,8 +30,8 @@ import {
 } from './game-engine.mapper';
 
 export interface GameEngineRepository {
-  listDraws(gameId: string): Observable<GameEngineDrawView[]>;
-  listCounters(gameId: string): Observable<GameEngineCounterView[]>;
+  listDraws(gameId: string, page?: number): Observable<GameEngineDrawsPageView>;
+  listCounters(gameId: string, page?: number): Observable<GameEngineCountersPageView>;
   getWinner(gameId: string): Observable<GameEngineWinnerView>;
   startGame(gameId: string): Observable<GameEngineStartCommandView>;
   pauseGame(gameId: string): Observable<GameEnginePauseCommandView>;
@@ -47,20 +49,20 @@ export class HttpGameEngineRepository implements GameEngineRepository {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
 
-  listDraws(gameId: string): Observable<GameEngineDrawView[]> {
+  listDraws(gameId: string, page = 1): Observable<GameEngineDrawsPageView> {
     return this.http
       .get<LaravelPaginatedResponse<unknown>>(
         `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/draws`,
-        { params: new HttpParams().set('per_page', 100) },
+        { params: new HttpParams().set('page', page) },
       )
       .pipe(map(mapGameEngineDrawsResponse));
   }
 
-  listCounters(gameId: string): Observable<GameEngineCounterView[]> {
+  listCounters(gameId: string, page = 1): Observable<GameEngineCountersPageView> {
     return this.http
       .get<LaravelPaginatedResponse<unknown>>(
         `${this.baseUrl}/admin/games/${encodeURIComponent(gameId)}/counters`,
-        { params: new HttpParams().set('per_page', 100) },
+        { params: new HttpParams().set('page', page) },
       )
       .pipe(map(mapGameEngineCountersResponse));
   }

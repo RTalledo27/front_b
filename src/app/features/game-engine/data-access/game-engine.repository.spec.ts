@@ -52,11 +52,12 @@ describe('HttpGameEngineRepository', () => {
 
   it('requests the admin draws endpoint with paginated read params', () => {
     repository.listDraws('game-1').subscribe((result) => {
-      expect(result).toHaveLength(1);
-      expect(result[0]?.drawnNumber).toBe(12);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.drawnNumber).toBe(12);
+      expect(result.pageInfo.currentPage).toBe(1);
     });
 
-    const request = http.expectOne('/api/v1/admin/games/game-1/draws?per_page=100');
+    const request = http.expectOne('/api/v1/admin/games/game-1/draws?page=1');
     expect(request.request.method).toBe('GET');
     request.flush({
       data: [
@@ -71,16 +72,17 @@ describe('HttpGameEngineRepository', () => {
         },
       ],
       links: { first: null, last: null, prev: null, next: null },
-      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '', per_page: 100, to: 1, total: 1 },
+      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '/api/v1/admin/games/game-1/draws', per_page: 50, to: 1, total: 1 },
     });
   });
 
   it('requests the admin counters endpoint with paginated read params', () => {
     repository.listCounters('game-1').subscribe((result) => {
-      expect(result[0]?.status.label).toBe('Disponible');
+      expect(result.items[0]?.status.label).toBe('Disponible');
+      expect(result.pageInfo.currentPage).toBe(1);
     });
 
-    const request = http.expectOne('/api/v1/admin/games/game-1/counters?per_page=100');
+    const request = http.expectOne('/api/v1/admin/games/game-1/counters?page=1');
     expect(request.request.method).toBe('GET');
     request.flush({
       data: [
@@ -93,7 +95,7 @@ describe('HttpGameEngineRepository', () => {
         },
       ],
       links: { first: null, last: null, prev: null, next: null },
-      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '', per_page: 100, to: 1, total: 1 },
+      meta: { current_page: 1, from: 1, last_page: 1, links: [], path: '/api/v1/admin/games/game-1/counters', per_page: 50, to: 1, total: 1 },
     });
   });
 
