@@ -14,8 +14,13 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { combineLatest } from 'rxjs';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
+import {
+  buildStartReadinessGuidance,
+  type GameOperationReadinessSnapshot,
+} from '../../../game-operation/utils/game-operation-guidance';
 import { formatGameDate } from '../../../public-games/utils/public-game-display';
 import { GameEngineFacade } from '../../data-access/game-engine.facade';
+import { GameEngineConsoleView } from '../../models/game-engine.models';
 
 @Component({
   selector: 'app-game-engine-page',
@@ -144,6 +149,19 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
                 </p>
               </div>
             </div>
+
+            @if (showStartGuidance()) {
+              <div class="operational-guidance">
+                <p class="operational-guidance__title">
+                  Antes de iniciar, el backend revisará estas condiciones conocidas:
+                </p>
+                <ul class="operational-guidance__list">
+                  @for (item of startReadinessGuidance(); track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+            }
 
             <div class="command-actions">
               @if (canStartGame()) {
@@ -499,7 +517,7 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
                 <div><dt>Ganó</dt><dd>{{ date(winner.wonAt) }}</dd></div>
               </dl>
             } @else {
-              <p class="empty-copy">El backend todavía no reporta ganador para este juego.</p>
+              <p class="empty-copy"><strong>Sin ganador aún.</strong> El backend todavía no reporta ganador para este juego.</p>
             }
           </article>
         </div>
@@ -750,6 +768,25 @@ import { GameEngineFacade } from '../../data-access/game-engine.facade';
       flex-wrap: wrap;
       gap: var(--s3);
     }
+    .operational-guidance {
+      padding: var(--s3);
+      border-radius: var(--r-md);
+      background: var(--neutral-50);
+    }
+    .operational-guidance__title {
+      margin: 0;
+      color: var(--color-text);
+      font-weight: 700;
+    }
+    .operational-guidance__list {
+      display: grid;
+      gap: var(--s2);
+      margin: var(--s3) 0 0;
+      padding-left: 1.15rem;
+    }
+    .operational-guidance__list li {
+      overflow-wrap: anywhere;
+    }
     .technical-panel__header {
       display: flex;
       gap: var(--s4);
@@ -923,6 +960,7 @@ export class GameEnginePage {
   readonly winner = computed(() => this.facade.snapshot()?.winner ?? this.fallbackWinner());
   readonly showEngineControls = computed(
     () =>
+      this.showStartGuidance() ||
       this.canStartGame() ||
       this.canPauseGame() ||
       this.canResumeGame() ||
@@ -942,6 +980,22 @@ export class GameEnginePage {
       this.facade.rebuildError() !== null ||
       this.facade.rebuildResult() !== null,
   );
+  readonly showStartGuidance = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return false;
+    }
+
+    return context.lifecycle.startedAt === null || this.facade.startError() !== null;
+  });
+  readonly startReadinessGuidance = computed(() => {
+    const context = this.facade.snapshot()?.context;
+    if (context === undefined) {
+      return [];
+    }
+
+    return buildStartReadinessGuidance(this.toReadinessSnapshot(context));
+  });
   readonly canStartGame = computed(() => {
     const context = this.facade.snapshot()?.context;
     if (context === undefined) {
@@ -1337,6 +1391,23 @@ export class GameEnginePage {
       winningHits: winner.winningHits,
       userId: winner.userId,
       wonAt: winner.wonAt,
+    };
+  }
+
+  private toReadinessSnapshot(
+    context: GameEngineConsoleView['context'],
+  ): GameOperationReadinessSnapshot {
+    return {
+      status: context.status.value,
+      scheduledStartAt: context.schedule.scheduledStartAt,
+      startedAt: context.lifecycle.startedAt,
+      ordersPending: context.commerce.orders.pending,
+      ordersPaymentSubmitted: context.commerce.orders.paymentSubmitted,
+      paymentsPending: context.commerce.payments.pending,
+      paymentsUnderReview: context.commerce.payments.underReview,
+      activeReservations: context.commerce.reservations.total,
+      reservedNumbers: context.numbers.reserved,
+      confirmedEntries: context.commerce.entries.confirmed,
     };
   }
 }

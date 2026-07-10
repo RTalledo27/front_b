@@ -11,19 +11,23 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
   selector: 'app-activate-page',
   imports: [ReactiveFormsModule, RouterLink],
   template: `<div class="auth-page">
-    <p class="eyebrow">Invitacion</p>
+    <p class="eyebrow">Invitación</p>
     <h2>Activa tu cuenta</h2>
-    <p class="intro">Usa el token recibido para definir tu contrasena inicial y entrar al portal.</p>
+    <p class="intro">Usa el token recibido para definir tu contraseña inicial y entrar al portal.</p>
+    <p class="notice notice--info">
+      Activar tu invitación crea tu acceso, pero algunas acciones como reservar números o subir evidencia
+      siguen requiriendo verificar tu correo.
+    </p>
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="form-field">
-        <label for="token">Token de activacion</label>
+        <label for="token">Token de activación</label>
         <input
           id="token"
           type="text"
           formControlName="token"
           autocomplete="one-time-code"
-          placeholder="Pega aqui tu token"
+          placeholder="Pega aquí tu token"
           [attr.aria-describedby]="tokenError() ? 'token-error' : null"
         />
         @if (tokenError()) {
@@ -32,13 +36,13 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </div>
 
       <div class="form-field">
-        <label for="password">Nueva contrasena</label>
+        <label for="password">Nueva contraseña</label>
         <input
           id="password"
           type="password"
           formControlName="password"
           autocomplete="new-password"
-          placeholder="Elige una contrasena segura"
+          placeholder="Elige una contraseña segura"
           [attr.aria-describedby]="passwordError() ? 'password-error' : null"
         />
         @if (passwordError()) {
@@ -47,13 +51,13 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       </div>
 
       <div class="form-field">
-        <label for="password_confirmation">Confirmar contrasena</label>
+        <label for="password_confirmation">Confirmar contraseña</label>
         <input
           id="password_confirmation"
           type="password"
           formControlName="password_confirmation"
           autocomplete="new-password"
-          placeholder="Repite tu contrasena"
+          placeholder="Repite tu contraseña"
           [attr.aria-describedby]="passwordConfirmationError() ? 'password-confirmation-error' : null"
         />
         @if (passwordConfirmationError()) {
@@ -66,7 +70,7 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
       }
 
       <button class="button" type="submit" [disabled]="submitting()">
-        {{ submitting() ? 'Activando cuenta...' : 'Activar cuenta' }}
+        {{ submitting() ? 'Activando cuenta…' : 'Activar cuenta' }}
       </button>
     </form>
 
@@ -84,6 +88,7 @@ import { AuthSessionService } from '../../../../core/auth/services/auth-session.
     .button { width: 100%; margin-top: var(--s2); }
     .error { color: var(--danger-600); font-size: var(--xs); font-weight: 650; }
     .notice { padding: var(--s3); margin: 0; border: 1px solid var(--color-border); border-radius: var(--r-md); font-size: var(--sm); }
+    .notice--info { border-left: 4px solid var(--color-brand); background: color-mix(in srgb, var(--color-brand) 8%, white); color: var(--color-text); }
     .notice--error { border-left: 4px solid var(--danger-600); background: var(--danger-50); color: var(--danger-600); }
     .links { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s5); }
     .links a { color: var(--color-link); font-size: var(--sm); font-weight: 750; text-decoration: none; }
@@ -111,7 +116,7 @@ export class ActivatePage {
 
   readonly tokenError = () => this.resolveFieldError('token', 'El token es obligatorio.');
   readonly passwordError = () =>
-    this.resolveFieldError('password', 'La contrasena debe tener al menos 8 caracteres.');
+    this.resolveFieldError('password', 'La contraseña debe tener al menos 8 caracteres.');
   readonly passwordConfirmationError = () => {
     const backendError = this.submitError()?.fieldErrors['password_confirmation']?.[0] ?? null;
 
@@ -124,11 +129,11 @@ export class ActivatePage {
     }
 
     if (this.form.controls.password_confirmation.invalid) {
-      return 'Confirma tu contrasena.';
+      return 'Confirma tu contraseña.';
     }
 
     if (this.passwordsDoNotMatch()) {
-      return 'Las contrasenas no coinciden.';
+      return 'Las contraseñas no coinciden.';
     }
 
     return null;
@@ -159,13 +164,13 @@ export class ActivatePage {
   resolveActivationMessage(error: ApiError): string {
     switch (error.reason) {
       case 'expired':
-        return 'La invitacion expiro.';
+        return 'La invitación expiró.';
       case 'revoked':
-        return 'La invitacion fue revocada.';
+        return 'La invitación fue revocada.';
       case 'consumed':
-        return 'La invitacion ya fue utilizada.';
+        return 'La invitación ya fue utilizada.';
       case 'already_active':
-        return 'La cuenta ya estaba activa. Inicia sesion.';
+        return 'La cuenta ya estaba activa. Inicia sesión.';
       default:
         return error.message;
     }

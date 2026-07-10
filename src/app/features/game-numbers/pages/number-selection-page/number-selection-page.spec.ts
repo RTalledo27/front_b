@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
+import { ApiError } from '../../../../core/api/models/api-error.models';
 import { NumberSelectionFacade } from '../../data-access/number-selection.facade';
 import { NumberSelectionPage } from './number-selection-page';
 
@@ -59,6 +60,7 @@ function createFacadeMock() {
     isAuthenticated: signal(false),
     viewStatus: signal<'loaded' | 'loading' | 'refreshing' | 'networkError' | 'unexpectedError'>('loaded'),
     reservationStatus: signal<'idle' | 'submitting' | 'success' | 'conflict' | 'inProgress' | 'validationError' | 'forbidden' | 'networkError' | 'rateLimited'>('idle'),
+    reservationError: signal<ApiError | null>(null),
     reservationResult: signal<null | {
       order: { id: string; expires_at: string };
     }>(null),
@@ -197,5 +199,36 @@ describe('NumberSelectionPage', () => {
     expect(cta.disabled).toBe(true);
     expect(cta.getAttribute('aria-busy')).toBe('true');
     expect(fixture.nativeElement.textContent).toContain('Reservando');
+  });
+
+  it('shows a verification CTA when the backend rejects reservation for an unverified email', async () => {
+    const facade = createFacadeMock();
+    facade.isAuthenticated.set(true);
+    facade.reservationStatus.set('forbidden');
+    facade.reservationError.set({
+      status: 403,
+      code: 'email_not_verified',
+      message: 'Debes verificar tu correo.',
+      fieldErrors: {},
+      reason: 'email_not_verified',
+    });
+    facade.liveMessage.set('Debes verificar tu correo.');
+
+    await TestBed.configureTestingModule({
+      imports: [NumberSelectionPage],
+      providers: [
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['slug', 'bingo-fortuna']]) } } },
+      ],
+    })
+      .overrideComponent(NumberSelectionPage, {
+        set: { providers: [{ provide: NumberSelectionFacade, useValue: facade }] },
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(NumberSelectionPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Necesitas verificar tu correo antes de reservar números reales.');
+    expect(fixture.nativeElement.textContent).toContain('Verificar mi correo');
   });
 });

@@ -50,6 +50,9 @@ describe('EmailVerificationNoticePage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('player@example.com');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Activar tu invitación crea tu acceso, pero no reemplaza la verificación del correo.',
+    );
     fixture.nativeElement.querySelector('button')?.click();
     expect(facade.resend).toHaveBeenCalledTimes(1);
   });

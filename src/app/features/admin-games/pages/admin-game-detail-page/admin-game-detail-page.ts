@@ -13,6 +13,11 @@ import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 import { AdminWinnerPayoutPanel } from '../../../admin-commerce/components/admin-winner-payout-panel/admin-winner-payout-panel';
 import { formatGameDate, formatMoney } from '../../../public-games/utils/public-game-display';
+import {
+  buildStartReadinessGuidance,
+  canAttemptStartFromKnownConditions,
+  type GameOperationReadinessSnapshot,
+} from '../../../game-operation/utils/game-operation-guidance';
 import { AdminGameNumbersPanel } from '../../components/admin-game-numbers-panel/admin-game-numbers-panel';
 import { AdminGameDetailFacade } from '../../data-access/admin-game-detail.facade';
 import {
@@ -157,6 +162,36 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
                 No hay acciones de este bloque disponibles para el estado actual. El motor técnico permanece aparte.
               </p>
             }
+
+            <section class="start-guidance" aria-labelledby="start-guidance-title">
+              <div class="start-guidance__header">
+                <div>
+                  <p class="eyebrow">Inicio real del juego</p>
+                  <h3 id="start-guidance-title">Guía operativa para start</h3>
+                </div>
+                <a
+                  class="button button--secondary"
+                  [routerLink]="['/admin/bingos', game.id, 'motor']"
+                  [queryParams]="backQueryParams"
+                >
+                  Abrir motor
+                </a>
+              </div>
+
+              <ul class="start-guidance__list">
+                @for (item of startReadinessGuidance(game); track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+
+              <p class="panel-note panel-note--compact">
+                {{
+                  canAttemptStartFromMotor(game)
+                    ? 'El backend volverá a validar órdenes, pagos, reservas, números reservados y entries confirmadas al iniciar.'
+                    : 'Si alguna condición no está visible en este detalle, el backend la validará al iniciar desde el motor.'
+                }}
+              </p>
+            </section>
 
             @if (activeAction(); as action) {
               <section
@@ -383,12 +418,41 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       color: var(--color-text-muted);
       overflow-wrap: anywhere;
     }
+    .panel-note--compact {
+      margin-top: var(--s3);
+    }
     .lifecycle-actions,
     .confirmation-actions {
       display: flex;
       gap: var(--s3);
       flex-wrap: wrap;
       margin-top: var(--s4);
+    }
+    .start-guidance {
+      margin-top: var(--s4);
+      padding: var(--s4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--r-lg);
+      background: var(--color-surface-subtle);
+    }
+    .start-guidance__header {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--s3);
+      align-items: flex-start;
+    }
+    .start-guidance__header > * {
+      min-width: 0;
+    }
+    .start-guidance__list {
+      display: grid;
+      gap: var(--s2);
+      margin: var(--s4) 0 0;
+      padding-left: 1.15rem;
+      color: var(--color-text);
+    }
+    .start-guidance__list li {
+      overflow-wrap: anywhere;
     }
     .confirmation-panel {
       margin-top: var(--s4);
@@ -483,7 +547,7 @@ import { formatAdminBoolean } from '../../utils/admin-games-display';
       .header-actions {
         justify-items: start;
       }
-      .facts div, .panel-heading, .confirmation-panel__header {
+      .facts div, .panel-heading, .confirmation-panel__header, .start-guidance__header {
         flex-direction: column;
       }
       dd {
@@ -551,6 +615,14 @@ export class AdminGameDetailPage {
 
   canCancel(game: AdminGameDetailView): boolean {
     return ['draft', 'published', 'sales_open', 'sales_closed', 'paused'].includes(game.status.value);
+  }
+
+  startReadinessGuidance(game: AdminGameDetailView): string[] {
+    return buildStartReadinessGuidance(this.toReadinessSnapshot(game));
+  }
+
+  canAttemptStartFromMotor(game: AdminGameDetailView): boolean {
+    return canAttemptStartFromKnownConditions(this.toReadinessSnapshot(game));
   }
 
   availableActionCount(game: AdminGameDetailView): number {
@@ -735,6 +807,21 @@ export class AdminGameDetailPage {
     }
 
     return JSON.stringify(settings, null, 2);
+  }
+
+  private toReadinessSnapshot(game: AdminGameDetailView): GameOperationReadinessSnapshot {
+    return {
+      status: game.status.value,
+      scheduledStartAt: game.schedule.scheduledStartAt,
+      startedAt: game.lifecycle.startedAt,
+      ordersPending: game.commerce.orders.pending,
+      ordersPaymentSubmitted: game.commerce.orders.paymentSubmitted,
+      paymentsPending: game.commerce.payments.pending,
+      paymentsUnderReview: game.commerce.payments.underReview,
+      activeReservations: game.commerce.reservations.total,
+      reservedNumbers: game.numbers.reserved,
+      confirmedEntries: game.commerce.entries.confirmed,
+    };
   }
 }
 

@@ -261,6 +261,27 @@ describe('GameEnginePage', () => {
     expect(text).toContain('Reconstruir counters');
   });
 
+  it('shows start guidance when sales are closed but scheduled_start_at is still in the future', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          scheduledStartAt: '2099-06-27T01:00:00Z',
+        },
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Antes de iniciar, el backend revisará estas condiciones conocidas');
+    expect(text).toContain('Todavía debes esperar a que llegue la hora programada de inicio');
+    expect(text).not.toContain('Iniciar juego');
+  });
+
   it('shows the pause action only when the contextual snapshot is pausable', async () => {
     const facade = createFacadeMock();
     facade.snapshot.set({
@@ -524,6 +545,22 @@ describe('GameEnginePage', () => {
 
     const fixture = await renderPage(facade);
     expect(fixture.nativeElement.textContent).toContain('Puedes reintentar con seguridad');
+  });
+
+  it('renders winner 404 as an honest empty state instead of a fatal error', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      winner: null,
+      context: {
+        ...facade.snapshot()!.context,
+        winner: null,
+      },
+    });
+
+    const fixture = await renderPage(facade);
+    expect(fixture.nativeElement.textContent).toContain('Sin ganador aún.');
+    expect(fixture.nativeElement.textContent).toContain('El backend todavía no reporta ganador');
   });
 
   it('shows the rebuild tool as a secondary technical action when the backend contract allows it', async () => {

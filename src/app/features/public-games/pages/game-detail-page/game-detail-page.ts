@@ -98,16 +98,13 @@ import {
               <span class="ticket-icon" aria-hidden="true">F</span>
               <p class="eyebrow">Participación</p>
               <h2 id="participation-title">Elige tus números</h2>
-              <p>
-                Revisa la disponibilidad pública y entra al tablero real de selección para reservar
-                con tu cuenta cuando la venta esté abierta.
-              </p>
+              <p>{{ participationMessage(game.status) }}</p>
               @if (game.status === 'sales_open') {
                 <a class="button" [routerLink]="['/bingos', game.slug, 'numeros']">Elegir números</a>
               } @else {
-                <button class="button" type="button" disabled>Ventas aún no disponibles</button>
+                <button class="button" type="button" disabled>{{ participationButtonLabel(game.status) }}</button>
               }
-              <small>La reserva usa contratos reales, autenticación e idempotencia del backend.</small>
+              <small>{{ participationNote(game.status) }}</small>
             </aside>
           </div>
         </article>
@@ -169,5 +166,43 @@ export class GameDetailPage {
 
   reload(): void {
     this.facade.load(this.slug);
+  }
+
+  participationMessage(status: string): string {
+    switch (status) {
+      case 'sales_open':
+        return 'Revisa la disponibilidad pública y entra al tablero real de selección para reservar con tu cuenta mientras la venta siga abierta.';
+      case 'sales_closed':
+        return 'Las ventas ya se cerraron. El backend prepara el juego para su inicio operativo y ya no acepta nuevas reservas.';
+      case 'running':
+        return 'Este juego ya está en curso. Puedes revisar la información publicada, pero ya no admite nuevas participaciones.';
+      case 'completed':
+        return 'Este juego ya finalizó. La pantalla pública conserva el contexto informativo sin inventar un dashboard adicional.';
+      default:
+        return 'Revisa la disponibilidad pública y espera a que la venta abra para reservar con tu cuenta.';
+    }
+  }
+
+  participationButtonLabel(status: string): string {
+    switch (status) {
+      case 'sales_closed':
+        return 'Ventas cerradas';
+      case 'running':
+        return 'Juego en curso';
+      case 'completed':
+        return 'Juego finalizado';
+      default:
+        return 'Ventas aún no disponibles';
+    }
+  }
+
+  participationNote(status: string): string {
+    switch (status) {
+      case 'running':
+      case 'completed':
+        return 'El estado visible viene del backend real del juego. No mostramos un dashboard en vivo sin contrato dedicado.';
+      default:
+        return 'La reserva usa contratos reales, autenticación e idempotencia del backend.';
+    }
   }
 }

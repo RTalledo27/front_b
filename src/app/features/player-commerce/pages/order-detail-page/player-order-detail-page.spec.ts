@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
+import { ApiError } from '../../../../core/api/models/api-error.models';
 import { PlayerOrderDetailFacade } from '../../data-access/player-order-detail.facade';
 import { PlayerOrderDetailView } from '../../models/player-commerce-view.models';
 import { PlayerOrderDetailPage } from './player-order-detail-page';
@@ -66,7 +67,7 @@ function createFacadeMock() {
       | 'networkError'
       | 'unexpectedError'
     >('idle'),
-    evidenceError: signal<{ message: string } | null>(null),
+    evidenceError: signal<ApiError | null>(null),
     submittedEvidence: signal<null | { submittedAt: string; document: { originalFilename: string } }>({
       submittedAt: '2026-06-26T10:00:00Z',
       document: { originalFilename: 'evidence.pdf' },
@@ -171,7 +172,13 @@ describe('PlayerOrderDetailPage', () => {
   it('marks the input as invalid and links the inline error when evidence validation fails', async () => {
     const facade = createFacadeMock();
     facade.evidenceStatus.set('validationError');
-    facade.evidenceError.set({ message: 'Solo se permiten archivos JPG, PNG, WEBP o PDF.' });
+    facade.evidenceError.set({
+      status: 422,
+      code: 'evidence_validation_failed',
+      message: 'Solo se permiten archivos JPG, PNG, WEBP o PDF.',
+      fieldErrors: { evidence: ['Solo se permiten archivos JPG, PNG, WEBP o PDF.'] },
+      reason: null,
+    });
 
     const { fixture } = await createComponent(facade);
     const fileInput = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement | null;
@@ -200,5 +207,36 @@ describe('PlayerOrderDetailPage', () => {
 
     const { fixture } = await createComponent(facade, 'missing-order');
     expect(fixture.nativeElement.textContent).toContain('La orden no esta disponible');
+  });
+
+  it('keeps idempotency conflicts visible as a technical contract problem', async () => {
+    const facade = createFacadeMock();
+    facade.evidenceStatus.set('idempotencyConflict');
+    facade.evidenceError.set({
+      status: 409,
+      code: 'idempotency_key_mismatch',
+      message: 'The current payload does not match the original request.',
+      fieldErrors: {},
+      reason: null,
+    });
+
+    const { fixture } = await createComponent(facade);
+    expect(fixture.nativeElement.textContent).toContain('Idempotency-Key');
+  });
+
+  it('shows a verification CTA when evidence upload is blocked by email verification', async () => {
+    const facade = createFacadeMock();
+    facade.evidenceStatus.set('forbidden');
+    facade.evidenceError.set({
+      status: 403,
+      code: 'email_not_verified',
+      message: 'Debes verificar tu correo.',
+      fieldErrors: {},
+      reason: 'email_not_verified',
+    });
+
+    const { fixture } = await createComponent(facade);
+    expect(fixture.nativeElement.textContent).toContain('Necesitas verificar tu correo antes de subir evidencia de pago.');
+    expect(fixture.nativeElement.textContent).toContain('Verificar mi correo');
   });
 });

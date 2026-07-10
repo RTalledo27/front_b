@@ -159,7 +159,12 @@ import {
                     </p>
                   }
                   @if (hasEvidenceError()) {
-                    <p id="payment-evidence-error" class="feedback-line feedback-line--danger">{{ facade.evidenceError()?.message }}</p>
+                    <p id="payment-evidence-error" class="feedback-line feedback-line--danger">
+                      {{ evidenceErrorMessage() }}
+                    </p>
+                    @if (needsEmailVerificationForEvidence()) {
+                      <a class="text-link" routerLink="/verifica-tu-correo">Verificar mi correo</a>
+                    }
                   }
                 </div>
 
@@ -289,6 +294,27 @@ export class PlayerOrderDetailPage {
     return this.facade.evidenceError() !== null && this.facade.evidenceStatus() !== 'success';
   }
 
+  evidenceErrorMessage(): string {
+    const error = this.facade.evidenceError();
+    if (error === null) {
+      return '';
+    }
+
+    if (this.facade.evidenceStatus() === 'idempotencyConflict') {
+      return 'El backend rechazó este envío porque la Idempotency-Key ya no coincide con el intento original.';
+    }
+
+    if (this.needsEmailVerificationForEvidence()) {
+      return 'Necesitas verificar tu correo antes de subir evidencia de pago.';
+    }
+
+    if (this.facade.evidenceStatus() === 'unauthorized') {
+      return 'Tu sesión expiró. Vuelve a iniciar sesión antes de reenviar la evidencia.';
+    }
+
+    return error.message;
+  }
+
   evidenceDescribedBy(): string {
     return this.hasEvidenceError()
       ? 'payment-evidence-help payment-evidence-error'
@@ -297,6 +323,18 @@ export class PlayerOrderDetailPage {
 
   showsReviewState(orderStatus: string, paymentStatus: string | null): boolean {
     return orderStatus === 'payment_submitted' || paymentStatus === 'under_review';
+  }
+
+  needsEmailVerificationForEvidence(): boolean {
+    const error = this.facade.evidenceError();
+    if (error === null) {
+      return false;
+    }
+
+    return (
+      this.facade.evidenceStatus() === 'forbidden' &&
+      (error.code === 'email_not_verified' || error.reason === 'email_not_verified')
+    );
   }
 
   submitLabel(status: PaymentEvidenceFlowStatus): string {

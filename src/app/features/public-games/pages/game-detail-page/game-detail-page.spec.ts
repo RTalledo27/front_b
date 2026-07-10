@@ -12,7 +12,7 @@ function createFacadeMock() {
       slug: 'bingo-fortuna',
       name: 'Bingo Fortuna',
       description: null,
-      status: 'sales_open' as const,
+      status: 'sales_open' as 'sales_open' | 'sales_closed' | 'running' | 'completed',
       numberMin: 1,
       numberMax: 90,
       hitsRequired: 15,
@@ -55,5 +55,35 @@ describe('GameDetailPage', () => {
     expect(text).toContain('La reserva usa contratos reales, autenticación e idempotencia del backend.');
     expect(text).not.toContain('La reserva real permanecerá bloqueada');
     expect(text).not.toContain('vista previa');
+  });
+
+  it('explains running games without inventing a live dashboard', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      status: 'running',
+    });
+
+    await TestBed.configureTestingModule({
+      imports: [GameDetailPage],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: new Map([['slug', 'bingo-fortuna']]) } },
+        },
+      ],
+    })
+      .overrideComponent(GameDetailPage, {
+        set: { providers: [{ provide: PublicGameDetailFacade, useValue: facade }] },
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(GameDetailPage);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Este juego ya está en curso.');
+    expect(text).toContain('No mostramos un dashboard en vivo sin contrato dedicado.');
+    expect(text).toContain('Juego en curso');
   });
 });

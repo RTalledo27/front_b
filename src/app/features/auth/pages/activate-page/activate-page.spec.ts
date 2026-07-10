@@ -84,6 +84,15 @@ describe('ActivatePage', () => {
     fixture.componentInstance.submit();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('La invitacion expiro.');
+    expect(fixture.nativeElement.textContent).toContain('La invitación expiró.');
+  });
+
+  it('clarifies that activation does not replace email verification', () => {
+    const fixture = TestBed.createComponent(ActivatePage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Activar tu invitación crea tu acceso, pero algunas acciones como reservar números o subir evidencia siguen requiriendo verificar tu correo.',
+    );
   });
 });

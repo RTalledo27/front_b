@@ -257,4 +257,66 @@ describe('AdminGameDetailPage', () => {
     expect(text).toContain('Sin configuración técnica registrada.');
     expect(fixture.nativeElement.querySelector('pre')?.textContent?.trim()).not.toBe('null');
   });
+
+  it('shows start guidance when sales are closed but the scheduled start is still in the future', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      status: { value: 'sales_closed', label: 'Ventas cerradas', tone: 'warning', isKnown: true },
+      schedule: {
+        ...facade.game().schedule,
+        scheduledStartAt: '2099-06-25T13:00:00Z',
+      },
+      commerce: {
+        ...facade.game().commerce,
+        reservations: { total: 0 },
+        orders: {
+          ...facade.game().commerce.orders,
+          pending: 0,
+          paymentSubmitted: 0,
+        },
+        payments: {
+          ...facade.game().commerce.payments,
+          pending: 0,
+          underReview: 0,
+        },
+      },
+    });
+
+    const { fixture } = await createComponent(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Guía operativa para start');
+    expect(text).toContain('Todavía debes esperar a que llegue la hora programada de inicio');
+  });
+
+  it('shows honest start guidance when confirmed entries or commerce readiness are still missing', async () => {
+    const facade = createFacadeMock();
+    facade.game.set({
+      ...facade.game(),
+      status: { value: 'sales_closed', label: 'Ventas cerradas', tone: 'warning', isKnown: true },
+      commerce: {
+        ...facade.game().commerce,
+        reservations: { total: 2 },
+        orders: {
+          ...facade.game().commerce.orders,
+          pending: 0,
+          paymentSubmitted: 1,
+        },
+        payments: {
+          ...facade.game().commerce.payments,
+          pending: 0,
+          underReview: 1,
+        },
+        entries: { confirmed: 0, cancelled: 0, refunded: 0, winner: 0 },
+      },
+      numbers: { ...facade.game().numbers, reserved: 2 },
+    });
+
+    const { fixture } = await createComponent(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Aún hay actividad comercial por resolver');
+    expect(text).toContain('Se necesita al menos una entry confirmada');
+  });
 });

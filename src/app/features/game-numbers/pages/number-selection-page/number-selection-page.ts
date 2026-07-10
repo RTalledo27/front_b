@@ -69,6 +69,13 @@ import { GameNumberOption } from '../../models/game-number.models';
                 <a [routerLink]="['/jugador/compras', orderId]">Ver detalle de orden</a>
               </div>
             }
+
+            @if (needsEmailVerification()) {
+              <div class="feedback-actions">
+                <span>Necesitas verificar tu correo antes de reservar números reales.</span>
+                <a routerLink="/verifica-tu-correo">Verificar mi correo</a>
+              </div>
+            }
           </aside>
         }
 
@@ -226,7 +233,8 @@ export class NumberSelectionPage {
   }
 
   numberLabel(item: GameNumberOption): string {
-    const state = item.status === 'available' ? 'disponible' : item.status === 'reserved' ? 'reservado' : 'vendido';
+    const state =
+      item.status === 'available' ? 'disponible' : item.status === 'reserved' ? 'reservado' : 'vendido';
     const selected = this.facade.isSelected(item.key) ? ', seleccionado' : '';
     return `Número ${item.number}, ${state}${selected}`;
   }
@@ -252,5 +260,17 @@ export class NumberSelectionPage {
   reservationExpiryLabel(): string {
     const expiresAt = this.facade.reservationResult()?.order.expires_at ?? null;
     return expiresAt && expiresAt.trim().length > 0 ? expiresAt : 'sin vencimiento informado';
+  }
+
+  needsEmailVerification(): boolean {
+    const error = this.facade.reservationError();
+    if (error === null) {
+      return false;
+    }
+
+    return (
+      this.facade.reservationStatus() === 'forbidden' &&
+      (error.code === 'email_not_verified' || error.reason === 'email_not_verified')
+    );
   }
 }

@@ -14,9 +14,15 @@ import { EmailVerificationFacade } from '../../data-access/email-verification.fa
         Tu cuenta ya aparece verificada. Puedes continuar con normalidad.
       } @else {
         Enviamos la verificación a <strong>{{ email() }}</strong>. Revisa tu bandeja y confirma
-        el enlace antes de continuar con acciones que requieran identidad validada.
+        el enlace antes de continuar con acciones como reservar números o subir evidencia.
       }
     </p>
+
+    @if (!isVerified()) {
+      <p class="notice notice--info">
+        Activar tu invitación crea tu acceso, pero no reemplaza la verificación del correo.
+      </p>
+    }
 
     @if (facade.resendMessage()) {
       <p class="notice notice--success" aria-live="polite">{{ facade.resendMessage() }}</p>
@@ -70,6 +76,11 @@ import { EmailVerificationFacade } from '../../data-access/email-verification.fa
       font-size: var(--sm);
     }
     .notice--error { border-left: 4px solid var(--danger-600); background: var(--danger-50); color: var(--danger-600); }
+    .notice--info {
+      border-left: 4px solid var(--color-brand);
+      background: color-mix(in srgb, var(--color-brand) 8%, white);
+      color: var(--color-text);
+    }
     .notice--success {
       border-left: 4px solid var(--color-brand);
       background: color-mix(in srgb, var(--color-brand) 8%, white);
