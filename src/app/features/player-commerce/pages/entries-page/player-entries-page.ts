@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { formatGameDate } from '../../../public-games/utils/public-game-display';
 import { PlayerEntriesFacade } from '../../data-access/player-collections.facade';
+import { PlayerEntryView } from '../../models/player-commerce-view.models';
 import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 
 @Component({
@@ -23,6 +24,16 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
         <section class="surface-card live-notice" aria-live="polite">
           No pudimos refrescar todo el estado público del juego. Conservamos tus cartones confirmados
           con la última información disponible.
+        </section>
+      }
+
+      @if (facade.refreshError() && facade.items().length) {
+        <section class="surface-card live-notice" aria-live="polite">
+          No pudimos actualizar el progreso live en este momento. Conservamos el último avance visible.
+        </section>
+      } @else if (facade.refreshing() && facade.items().length) {
+        <section class="surface-card live-notice" aria-live="polite">
+          Actualizando progreso live de tus cartones…
         </section>
       }
 
@@ -81,7 +92,29 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 
               @if (liveGame(item.gameId); as liveGameState) {
                 <div class="entry__live">
-                  @if (liveGameState.status === 'running') {
+                  @if (item.liveProgress; as progress) {
+                    <strong>{{ liveProgressHeading(progress.gameStatus) }}</strong>
+                    <p>{{ liveProgressBody(progress) }}</p>
+                    @if (progress.hitsRequired !== null) {
+                      <small>Aciertos reales: {{ progress.hitsCurrent }}/{{ progress.hitsRequired }}</small>
+                    }
+                    @if (progress.latestDrawNumber !== null && progress.latestDrawSequence !== null) {
+                      <small>
+                        Último número sorteado: {{ progress.latestDrawNumber }} · sorteo #{{ progress.latestDrawSequence }}
+                      </small>
+                    }
+                    @if (progress.gameStatus === 'running') {
+                      <small>
+                        {{
+                          liveGameState.schedule.nextDrawAt
+                            ? 'Próxima referencia ' + date(liveGameState.schedule.nextDrawAt)
+                            : 'El backend actualizará el progreso en la siguiente extracción.'
+                        }}
+                      </small>
+                    } @else if (progress.gameStatus === 'completed' && progress.wonAt) {
+                      <small>Victoria registrada {{ date(progress.wonAt) }}</small>
+                    }
+                  } @else if (liveGameState.status === 'running') {
                     <strong>Juego en vivo</strong>
                     <p>
                       @if (liveGameState.latestDraw; as latestDraw) {
@@ -198,5 +231,34 @@ export class PlayerEntriesPage {
       default:
         return 'neutral';
     }
+  }
+
+  liveProgressHeading(
+    status: NonNullable<PlayerEntryView['liveProgress']>['gameStatus'],
+  ): string {
+    switch (status) {
+      case 'running':
+        return 'Progreso en vivo';
+      case 'completed':
+        return 'Resultado final';
+      default:
+        return this.gameLabel(status);
+    }
+  }
+
+  liveProgressBody(progress: NonNullable<PlayerEntryView['liveProgress']>): string {
+    if (progress.isWinner) {
+      return 'Tu cartón alcanzó el resultado ganador con datos reales del backend.';
+    }
+
+    if (progress.gameStatus === 'completed') {
+      return 'El juego terminó y este cartón no figura como ganador.';
+    }
+
+    if (progress.gameStatus === 'running') {
+      return 'Este cartón sigue participando y su avance se calcula con draws reales del backend.';
+    }
+
+    return 'El cartón está confirmado y el backend publicará más avance cuando el juego corra.';
   }
 }

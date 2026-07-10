@@ -83,6 +83,28 @@ export interface PlayerEntryApiDto {
   confirmed_at: string | null;
   game: { id: string; slug: string; name: string } | null;
   game_number: { id: string; number: number; status: GameNumberStatus } | null;
+  live_progress?: {
+    entry_id: string;
+    game_id: string;
+    game_status:
+      | 'draft'
+      | 'published'
+      | 'sales_open'
+      | 'sales_closed'
+      | 'running'
+      | 'paused'
+      | 'resolving'
+      | 'completed'
+      | 'cancelled';
+    game_number: number | null;
+    hits_current: number;
+    hits_required: number | null;
+    latest_draw_number: number | null;
+    latest_draw_sequence: number | null;
+    is_winner: boolean;
+    completed_at: string | null;
+    won_at: string | null;
+  } | null;
 }
 
 export interface EvidenceSubmissionApiDto {

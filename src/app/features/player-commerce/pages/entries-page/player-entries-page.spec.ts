@@ -18,10 +18,28 @@ function createFacadeMock() {
         confirmedAt: '2026-07-05T12:00:00Z',
         game: { id: 'game-1', slug: 'bingo-real', name: 'Bingo Real' },
         gameNumber: { id: 'gn-1', number: 7, status: 'sold' as const },
+        liveProgress: {
+          entryId: 'entry-1',
+          gameId: 'game-1',
+          gameStatus: 'running' as const,
+          gameNumber: 7,
+          hitsCurrent: 1,
+          hitsRequired: 5,
+          latestDrawNumber: 11,
+          latestDrawSequence: 2,
+          isWinner: false,
+          completedAt: null,
+          wonAt: null,
+        },
       },
     ]),
-    status: signal<'loaded' | 'loading' | 'empty' | 'unauthorized' | 'forbidden' | 'networkError' | 'unexpectedError' | 'notFound'>('loaded'),
+    status: signal<
+      'loaded' | 'loading' | 'empty' | 'unauthorized' | 'forbidden' | 'networkError' | 'unexpectedError' | 'notFound'
+    >('loaded'),
     error: signal<{ message: string } | null>(null),
+    refreshing: signal(false),
+    refreshError: signal<{ message: string } | null>(null),
+    lastUpdatedAt: signal<string | null>('2026-07-05T12:00:08Z'),
     liveGames: signal({
       'game-1': {
         id: 'game-1',
@@ -94,7 +112,7 @@ function createFacadeMock() {
 }
 
 describe('PlayerEntriesPage', () => {
-  it('shows the live public game state for a confirmed cartón without inventing hits', async () => {
+  it('shows X/Y real when the backend exposes live_progress', async () => {
     const facade = createFacadeMock();
 
     await TestBed.configureTestingModule({
@@ -110,9 +128,29 @@ describe('PlayerEntriesPage', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('Juego en vivo');
+    expect(text).toContain('Progreso en vivo');
+    expect(text).toContain('1/5');
     expect(text).toContain('Último número sorteado: 11');
-    expect(text).toContain('La actualización de aciertos depende del estado publicado por el juego.');
-    expect(text).not.toContain('1/5');
+  });
+
+  it('keeps the last visible data when a silent refresh fails', async () => {
+    const facade = createFacadeMock();
+    facade.refreshError.set({ message: 'Sin conexión' });
+
+    await TestBed.configureTestingModule({
+      imports: [PlayerEntriesPage],
+      providers: [provideRouter([])],
+    })
+      .overrideComponent(PlayerEntriesPage, {
+        set: { providers: [{ provide: PlayerEntriesFacade, useValue: facade }] },
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(PlayerEntriesPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Conservamos el último avance visible.',
+    );
   });
 });

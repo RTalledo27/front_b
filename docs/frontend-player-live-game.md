@@ -83,12 +83,20 @@ El backend ya expone suficiente estado público para mostrar juego en vivo, últ
 
 ## Validación
 
-- `npm test -- --watch=false`: `68 files / 525 tests passed`
+- `npm test -- --watch=false`: `68 files / 529 tests passed`
 - `npm run build`: OK
 - `npm run lint`: no existe script `lint`
 - Warning conocido:
-  - `number-selection-page.ts` sigue excediendo su budget histórico, ahora `4.60 kB` sobre budget `4.00 kB`
+- `number-selection-page.ts` sigue excediendo su budget histórico, ahora `4.60 kB` sobre budget `4.00 kB`
 - Sin warning nuevo en `game-detail-page.ts`
+
+## Actualización B14
+
+- `B14` extendió `GET /api/v1/me/entries` con `live_progress`.
+- `/jugador/cartones` ahora muestra `X/Y` real cuando el backend lo expone.
+- `/jugador/inicio` reutiliza ese progreso real en el resumen de cartones.
+- El fallback honesto anterior se conserva para compatibilidad.
+- Polling liviano agregado en cartones sólo mientras exista al menos un juego `running`.
 
 ## Riesgos
 

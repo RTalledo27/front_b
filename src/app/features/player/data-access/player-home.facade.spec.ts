@@ -201,6 +201,19 @@ describe('PlayerHomeFacade', () => {
         confirmed_at: '2026-07-04T18:00:00Z',
         game: { id: 'game-9', slug: 'fortuna-final', name: 'Fortuna Final' },
         game_number: { id: 'gn-9', number: 19, status: 'sold' },
+        live_progress: {
+          entry_id: 'entry-1',
+          game_id: 'game-9',
+          game_status: 'completed',
+          game_number: 19,
+          hits_current: 2,
+          hits_required: 5,
+          latest_draw_number: 19,
+          latest_draw_sequence: 9,
+          is_winner: false,
+          completed_at: '2026-07-05T12:10:00Z',
+          won_at: null,
+        },
       },
     ];
 
@@ -329,6 +342,15 @@ describe('PlayerHomeFacade', () => {
     expect(facade.runningGames()).toHaveLength(1);
     expect(facade.gameLiveState('game-1')?.latestDraw?.number).toBe(17);
     expect(facade.gameLiveState('game-9')?.status).toBe('completed');
+  });
+
+  it('preserves backend live progress from /me/entries for the latest cartón', async () => {
+    const { facade } = await configureFacade();
+
+    facade.load();
+
+    expect(facade.latestEntry()?.liveProgress?.hitsCurrent).toBe(2);
+    expect(facade.latestEntry()?.liveProgress?.hitsRequired).toBe(5);
   });
 
   it('reports a full unauthorized state when the three endpoints require a valid session', async () => {

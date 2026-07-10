@@ -115,6 +115,19 @@ function createFacadeMock() {
     confirmedAt: string | null;
     game: { id: string; slug: string; name: string } | null;
     gameNumber: { id: string; number: number; status: 'sold' } | null;
+    liveProgress: {
+      entryId: string;
+      gameId: string;
+      gameStatus: 'completed';
+      gameNumber: number;
+      hitsCurrent: number;
+      hitsRequired: number;
+      latestDrawNumber: number;
+      latestDrawSequence: number;
+      isWinner: false;
+      completedAt: string;
+      wonAt: null;
+    } | null;
   } | null>({
     id: 'entry-1',
     gameId: 'game-9',
@@ -123,6 +136,19 @@ function createFacadeMock() {
     confirmedAt: '2026-07-04T18:00:00Z',
     game: { id: 'game-9', slug: 'fortuna-final', name: 'Fortuna Final' },
     gameNumber: { id: 'gn-9', number: 19, status: 'sold' },
+    liveProgress: {
+      entryId: 'entry-1',
+      gameId: 'game-9',
+      gameStatus: 'completed',
+      gameNumber: 19,
+      hitsCurrent: 2,
+      hitsRequired: 5,
+      latestDrawNumber: 19,
+      latestDrawSequence: 9,
+      isWinner: false,
+      completedAt: '2026-07-05T12:10:00Z',
+      wonAt: null,
+    },
   });
 
   return {
@@ -201,6 +227,19 @@ function createFacadeMock() {
         confirmedAt: '2026-07-04T18:00:00Z',
         game: { id: 'game-9', slug: 'fortuna-final', name: 'Fortuna Final' },
         gameNumber: { id: 'gn-9', number: 19, status: 'sold' as const },
+        liveProgress: {
+          entryId: 'entry-1',
+          gameId: 'game-9',
+          gameStatus: 'completed' as const,
+          gameNumber: 19,
+          hitsCurrent: 2,
+          hitsRequired: 5,
+          latestDrawNumber: 19,
+          latestDrawSequence: 9,
+          isWinner: false,
+          completedAt: '2026-07-05T12:10:00Z',
+          wonAt: null,
+        },
       },
     ]),
     entriesTotal: signal(1),
@@ -244,6 +283,7 @@ describe('PlayerHomePage', () => {
     expect(text).toContain('Hola, Andrea Real');
     expect(text).toContain('Tu actividad real en Fortuna');
     expect(text).toContain('Bingo Real');
+    expect(text).toContain('2/5 aciertos');
     expect(text).not.toContain('S/ 2,000');
     expect(text).not.toContain('Noche de Fortuna');
   });

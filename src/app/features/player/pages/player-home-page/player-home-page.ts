@@ -186,6 +186,9 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
                   Número no disponible
                 }
                 · {{ entry.game?.name ?? 'Juego sin nombre disponible' }}
+                @if (entry.liveProgress?.hitsRequired !== null) {
+                  · {{ entry.liveProgress?.hitsCurrent }}/{{ entry.liveProgress?.hitsRequired }} aciertos
+                }
               } @else if (facade.entriesStatus() === 'empty') {
                 Sin cartones confirmados.
               } @else {
@@ -313,6 +316,9 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
                         }}
                       </strong>
                       <p>{{ entry.game?.name ?? 'Juego sin nombre disponible' }}</p>
+                      @if (entry.liveProgress?.hitsRequired !== null) {
+                        <p>{{ entry.liveProgress?.hitsCurrent }}/{{ entry.liveProgress?.hitsRequired }} aciertos reales</p>
+                      }
                     </div>
                     <div class="list-row__meta">
                       <app-status-badge

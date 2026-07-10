@@ -101,4 +101,26 @@ export interface PlayerEntryView {
   confirmedAt: string | null;
   game: { id: string; slug: string; name: string } | null;
   gameNumber: { id: string; number: number; status: 'available' | 'reserved' | 'sold' } | null;
+  liveProgress: {
+    entryId: string;
+    gameId: string;
+    gameStatus:
+      | 'draft'
+      | 'published'
+      | 'sales_open'
+      | 'sales_closed'
+      | 'running'
+      | 'paused'
+      | 'resolving'
+      | 'completed'
+      | 'cancelled';
+    gameNumber: number | null;
+    hitsCurrent: number;
+    hitsRequired: number | null;
+    latestDrawNumber: number | null;
+    latestDrawSequence: number | null;
+    isWinner: boolean;
+    completedAt: string | null;
+    wonAt: string | null;
+  } | null;
 }

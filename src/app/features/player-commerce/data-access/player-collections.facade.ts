@@ -57,6 +57,7 @@ export class PlayerEntriesFacade {
   private readonly gamesRepository = inject(PUBLIC_GAMES_REPOSITORY);
   private readonly destroyRef = inject(DestroyRef);
   private liveVersion = 0;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly items = signal<PlayerEntryView[]>([]);
   readonly status = signal<PlayerCommerceViewStatus>('idle');
@@ -64,31 +65,29 @@ export class PlayerEntriesFacade {
   readonly liveGames = signal<Record<string, PublicGame>>({});
   readonly liveGamesStatus = signal<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   readonly liveGamesError = signal<ApiError | null>(null);
+  readonly refreshing = signal(false);
+  readonly refreshError = signal<ApiError | null>(null);
+  readonly lastUpdatedAt = signal<string | null>(null);
+
+  constructor() {
+    this.destroyRef.onDestroy(() => this.stopPolling());
+  }
 
   load(): void {
+    this.stopPolling();
     this.status.set('loading');
     this.error.set(null);
+    this.refreshError.set(null);
 
-    this.repository
-      .listEntries()
-      .pipe(
-        map((response) => mapPlayerEntriesResponse(response)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (items) => {
-          this.items.set(items);
-          this.status.set(items.length > 0 ? 'loaded' : 'empty');
-          this.loadLiveGames(items);
-        },
-        error: (error: unknown) => {
-          const apiError = resolvePlayerCommerceError(error);
-          this.items.set([]);
-          this.error.set(apiError);
-          this.status.set(resolveReadStatus(apiError.status));
-          this.loadLiveGames([]);
-        },
-      });
+    this.fetchEntries(false);
+  }
+
+  refresh(): void {
+    if (this.refreshing() || this.status() === 'loading') {
+      return;
+    }
+
+    this.fetchEntries(true);
   }
 
   gameLiveState(gameId: string | null | undefined): PublicGame | null {
@@ -153,6 +152,67 @@ export class PlayerEntriesFacade {
         this.liveGamesError.set(firstError);
         this.liveGamesStatus.set(Object.keys(nextGames).length > 0 ? 'loaded' : 'error');
       });
+  }
+
+  private fetchEntries(preserveData: boolean): void {
+    if (preserveData) {
+      this.refreshing.set(true);
+      this.refreshError.set(null);
+    }
+
+    this.repository
+      .listEntries()
+      .pipe(
+        map((response) => mapPlayerEntriesResponse(response)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (items) => {
+          this.items.set(items);
+          this.status.set(items.length > 0 ? 'loaded' : 'empty');
+          this.error.set(null);
+          this.refreshing.set(false);
+          this.refreshError.set(null);
+          this.lastUpdatedAt.set(new Date().toISOString());
+          this.loadLiveGames(items);
+          this.schedulePolling(items);
+        },
+        error: (error: unknown) => {
+          const apiError = resolvePlayerCommerceError(error);
+
+          if (preserveData && this.items().length > 0) {
+            this.refreshing.set(false);
+            this.refreshError.set(apiError);
+            this.schedulePolling(this.items());
+            return;
+          }
+
+          this.items.set([]);
+          this.error.set(apiError);
+          this.status.set(resolveReadStatus(apiError.status));
+          this.refreshing.set(false);
+          this.refreshError.set(null);
+          this.loadLiveGames([]);
+          this.stopPolling();
+        },
+      });
+  }
+
+  private schedulePolling(items: readonly PlayerEntryView[]): void {
+    this.stopPolling();
+
+    if (!items.some((item) => item.liveProgress?.gameStatus === 'running')) {
+      return;
+    }
+
+    this.refreshTimer = setTimeout(() => this.refresh(), 10000);
+  }
+
+  private stopPolling(): void {
+    if (this.refreshTimer !== null) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 }
 

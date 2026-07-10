@@ -168,6 +168,7 @@ export function mapPlayerEntry(payload: unknown): PlayerEntryView {
     confirmedAt: readNullableIsoDate(dto['confirmed_at']),
     game: mapNullableGame(dto['game']),
     gameNumber: mapNullableEntryGameNumber(dto['game_number']),
+    liveProgress: mapNullableEntryLiveProgress(dto['live_progress']),
   };
 }
 
@@ -275,6 +276,28 @@ function mapNullableEntryGameNumber(payload: unknown): { id: string; number: num
   };
 }
 
+function mapNullableEntryLiveProgress(payload: unknown): PlayerEntryView['liveProgress'] {
+  if (payload === null || typeof payload === 'undefined') {
+    return null;
+  }
+
+  const record = readRecord(payload);
+
+  return {
+    entryId: readString(record['entry_id']),
+    gameId: readString(record['game_id']),
+    gameStatus: readGameStatus(record['game_status']),
+    gameNumber: readNullableNumber(record['game_number']),
+    hitsCurrent: readNumber(record['hits_current']),
+    hitsRequired: readNullableNumber(record['hits_required']),
+    latestDrawNumber: readNullableNumber(record['latest_draw_number']),
+    latestDrawSequence: readNullableNumber(record['latest_draw_sequence']),
+    isWinner: readBoolean(record['is_winner']),
+    completedAt: readNullableIsoDate(record['completed_at']),
+    wonAt: readNullableIsoDate(record['won_at']),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -313,6 +336,14 @@ function readNullableString(value: unknown): string | null {
 
 function readNumber(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(INVALID_PAYLOAD_ERROR);
+  }
+
+  return value;
+}
+
+function readBoolean(value: unknown): boolean {
+  if (typeof value !== 'boolean') {
     throw new Error(INVALID_PAYLOAD_ERROR);
   }
 
@@ -388,6 +419,28 @@ function readNullableGameNumberStatus(value: unknown): 'available' | 'reserved' 
 function readEntryStatus(value: unknown): 'confirmed' | 'winner' | 'cancelled' {
   const status = readString(value);
   if (status === 'confirmed' || status === 'winner' || status === 'cancelled') {
+    return status;
+  }
+
+  throw new Error(INVALID_PAYLOAD_ERROR);
+}
+
+function readGameStatus(
+  value: unknown,
+): NonNullable<PlayerEntryView['liveProgress']>['gameStatus'] {
+  const status = readString(value);
+
+  if (
+    status === 'draft' ||
+    status === 'published' ||
+    status === 'sales_open' ||
+    status === 'sales_closed' ||
+    status === 'running' ||
+    status === 'paused' ||
+    status === 'resolving' ||
+    status === 'completed' ||
+    status === 'cancelled'
+  ) {
     return status;
   }
 
