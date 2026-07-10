@@ -1065,7 +1065,8 @@ describe('GameEngineFacade', () => {
       command$.next(createSuccessResult(command) as CommandResultMap[typeof command]);
 
       expect(commandStatus(facade, command)).toBe('success');
-      expect(facade.status()).toBe('networkError');
+      expect(facade.status()).toBe('loaded');
+      expect(facade.silentRefreshError()).not.toBeNull();
     });
   }
 
@@ -1178,6 +1179,149 @@ describe('GameEngineFacade', () => {
 
     expect(capturedCommandIds).toHaveLength(2);
     expect(capturedCommandIds[0]).not.toBe(capturedCommandIds[1]);
+  });
+
+  it('stores the last draw result, patches the visible snapshot and refreshes silently', () => {
+    const drawCommand$ = new Subject<GameEngineDrawCommandView>();
+    const refreshedContext$ = new Subject<AdminGameDetailView>();
+    const refreshedDraws$ = new Subject<unknown[]>();
+    const refreshedCounters$ = new Subject<unknown[]>();
+    const refreshedWinner$ = new Subject<unknown>();
+
+    const { facade, adminRepository, engineRepository } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream(createLoadedContextForCommand('draw')))
+        .mockReturnValueOnce(refreshedContext$),
+      drawsRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream([]))
+        .mockReturnValueOnce(refreshedDraws$),
+      countersRequest: vi
+        .fn()
+        .mockReturnValueOnce(
+          settledStream([
+            {
+              gameNumberId: 'number-1',
+              number: 19,
+              status: { value: 'sold', label: 'Vendido', tone: 'info', isKnown: true },
+              hitsCount: 0,
+              lastDrawSequence: null,
+            },
+          ]),
+        )
+        .mockReturnValueOnce(refreshedCounters$),
+      winnerRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledWinnerRequest())
+        .mockReturnValueOnce(refreshedWinner$),
+      drawRequest: () => drawCommand$,
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.drawNumber();
+    drawCommand$.next(createSuccessResult('draw') as GameEngineDrawCommandView);
+
+    expect(facade.drawStatus()).toBe('success');
+    expect(facade.status()).toBe('loaded');
+    expect(facade.lastDrawResult()?.drawnNumber).toBe(19);
+    expect(facade.drawSyncPending()).toBe(true);
+    expect(facade.silentRefreshing()).toBe(true);
+    expect(adminRepository.getGame).toHaveBeenCalledTimes(2);
+    expect(engineRepository.listDraws).toHaveBeenCalledTimes(2);
+    expect(facade.snapshot()?.context.latestDraw?.number).toBe(19);
+    expect(facade.snapshot()?.draws[0]?.drawnNumber).toBe(19);
+    expect(facade.snapshot()?.counters[0]?.hitsCount).toBe(1);
+
+    settleLoadedSubjects({
+      context$: refreshedContext$,
+      draws$: refreshedDraws$,
+      counters$: refreshedCounters$,
+      winner$: refreshedWinner$,
+      context: createRefreshedContext('draw'),
+    });
+
+    expect(facade.drawSyncPending()).toBe(false);
+    expect(facade.silentRefreshing()).toBe(false);
+  });
+
+  it('marks the game as completed immediately when the draw response creates a winner', () => {
+    const winnerCommand$ = new Subject<GameEngineDrawCommandView>();
+
+    const { facade } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream(createLoadedContextForCommand('draw')))
+        .mockReturnValueOnce(
+          settledStream(
+            createContext('game-1', {
+              status: { value: 'completed', label: 'Finalizado', tone: 'success', isKnown: true },
+              schedule: {
+                salesOpensAt: null,
+                salesClosesAt: null,
+                scheduledStartAt: '2026-06-27T12:00:00Z',
+                drawIntervalSeconds: 30,
+                autoDrawEnabled: false,
+              },
+              lifecycle: {
+                startedAt: '2026-06-27T12:05:00Z',
+                pausedAt: null,
+                completedAt: '2026-06-27T12:16:00Z',
+              },
+            }),
+          ),
+        ),
+      drawsRequest: vi.fn().mockReturnValue(settledStream([])),
+      countersRequest: vi.fn().mockReturnValue(settledStream([])),
+      winnerRequest: vi.fn().mockReturnValue(settledWinnerRequest()),
+      drawRequest: () => winnerCommand$,
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.drawNumber();
+    winnerCommand$.next({
+      gameId: 'game-1',
+      drawId: 'draw-3',
+      gameNumberId: 'number-1',
+      sequence: 3,
+      drawnNumber: 1,
+      currentHits: 2,
+      hitsRequired: 2,
+      numberIsSold: true,
+      winnerCreated: true,
+      winnerEntryId: 'entry-1',
+      gameStatus: 'completed',
+      drawnAt: '2026-06-27T12:16:00Z',
+      replay: false,
+    });
+
+    expect(facade.snapshot()?.context.status.value).toBe('completed');
+    expect(facade.snapshot()?.context.lifecycle.completedAt).toBe('2026-06-27T12:16:00Z');
+    expect(facade.lastDrawResult()?.winnerCreated).toBe(true);
+  });
+
+  it('keeps the previous snapshot visible when the post-draw refresh fails', () => {
+    const { facade } = setup({
+      contextRequest: vi
+        .fn()
+        .mockReturnValueOnce(settledStream(createLoadedContextForCommand('draw')))
+        .mockReturnValueOnce(
+          throwError(() => new HttpErrorResponse({ status: 0, error: new ProgressEvent('error') })),
+        ),
+      drawsRequest: vi.fn().mockReturnValue(settledStream([])),
+      countersRequest: vi.fn().mockReturnValue(settledStream([])),
+      winnerRequest: vi.fn().mockReturnValue(settledWinnerRequest()),
+      drawRequest: () => settledStream(createSuccessResult('draw') as GameEngineDrawCommandView),
+    });
+
+    facade.load('game-1', 'contextual');
+    facade.drawNumber();
+
+    expect(facade.drawStatus()).toBe('success');
+    expect(facade.snapshot()?.context.id).toBe('game-1');
+    expect(facade.status()).toBe('loaded');
+    expect(facade.silentRefreshError()?.status).toBe(0);
+    expect(facade.drawSyncPending()).toBe(false);
   });
 
   it('discards the pending draw command id when the user changes game', () => {
@@ -1332,6 +1476,7 @@ describe('GameEngineFacade', () => {
     expect(capturedCommandIds[0]).toBe(capturedCommandIds[1]);
     expect(facade.drawStatus()).toBe('success');
     expect(facade.drawResult()?.replay).toBe(true);
+    expect(facade.lastDrawResult()?.replay).toBe(true);
   });
 
   it('submits rebuild successfully and refreshes the console', () => {
@@ -1566,8 +1711,8 @@ describe('GameEngineFacade', () => {
 
     expect(facade.rebuildStatus()).toBe('success');
     expect(facade.rebuildResult()?.outcome).toBe('rebuilt');
-    expect(facade.status()).toBe('networkError');
-    expect(facade.error()).not.toBeNull();
+    expect(facade.status()).toBe('loaded');
+    expect(facade.silentRefreshError()).not.toBeNull();
   });
 
   for (const [httpStatus, expectedStatus] of [

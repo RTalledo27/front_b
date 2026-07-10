@@ -72,10 +72,10 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
             </button>
           </form>
         </section>
-      } @else if (facade.status() === 'loading' || facade.status() === 'refreshing') {
+      } @else if (facade.status() === 'loading') {
         <section class="surface-card data-state" aria-busy="true" aria-live="polite">
           <span class="data-loader"></span>
-          <h2>{{ facade.status() === 'loading' ? 'Cargando contexto del motor…' : 'Actualizando auditoría…' }}</h2>
+          <h2>Cargando contexto del motor…</h2>
           <p>Consultamos el detalle del juego y el estado operativo expuesto por Laravel.</p>
         </section>
       } @else if (facade.status() === 'unauthorized') {
@@ -137,6 +137,17 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
             {{ snapshot.context.status.label }}
           </app-status-badge>
         </section>
+
+        @if (facade.silentRefreshing()) {
+          <p class="read-only-note" aria-live="polite" style="border:1px dashed var(--color-border);">
+            Sincronizando historial, contadores y ganador sin recargar toda la consola.
+          </p>
+        } @else if (facade.silentRefreshError()) {
+          <p class="read-only-note" role="status" style="border:1px dashed var(--color-border);">
+            El último cambio quedó registrado, pero no pudimos sincronizar todos los paneles.
+            {{ facade.silentRefreshError()?.message }}
+          </p>
+        }
 
         @if (showEngineControls()) {
           <section class="surface-card start-panel" aria-live="polite">
@@ -203,10 +214,14 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                   #openDrawButton
                   class="button"
                   type="button"
-                  [disabled]="facade.drawStatus() === 'submitting'"
+                  [disabled]="facade.drawStatus() === 'submitting' || facade.drawSyncPending()"
                   (click)="openDrawConfirmation()"
                 >
-                  {{ facade.drawStatus() === 'submitting' ? 'Sorteando…' : 'Sortear número' }}
+                  {{
+                    facade.drawStatus() === 'submitting' || facade.drawSyncPending()
+                      ? 'Sorteando…'
+                      : 'Sortear número'
+                  }}
                 </button>
               }
             </div>
@@ -333,7 +348,7 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                 {{
                   startResult.outcome === 'already_started'
                     ? 'El backend confirmó que el juego ya estaba iniciado.'
-                    : 'El juego se inició correctamente y el contexto se está refrescando.'
+                    : 'El juego se inició correctamente y la consola se está sincronizando en segundo plano.'
                 }}
               </p>
             } @else if (facade.startError()) {
@@ -347,7 +362,7 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                 {{
                   pauseResult.outcome === 'already_paused'
                     ? 'El backend confirmó que el juego ya estaba pausado.'
-                    : 'El juego se pausó correctamente y el contexto se está refrescando.'
+                    : 'El juego se pausó correctamente y la consola se está sincronizando en segundo plano.'
                 }}
               </p>
             } @else if (facade.pauseError()) {
@@ -361,7 +376,7 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                 {{
                   resumeResult.outcome === 'already_running'
                     ? 'El backend confirmó que el juego ya estaba en ejecución.'
-                    : 'El juego se reanudó correctamente y el contexto se está refrescando.'
+                    : 'El juego se reanudó correctamente y la consola se está sincronizando en segundo plano.'
                 }}
               </p>
             } @else if (facade.resumeError()) {
@@ -374,10 +389,10 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
               <p class="feedback feedback--success" role="status">
                 {{
                   drawResult.replay
-                    ? 'El backend confirmó el replay del mismo sorteo manual y el contexto se está refrescando.'
+                    ? 'El backend confirmó el replay del mismo sorteo manual y la consola se está sincronizando en segundo plano.'
                     : 'Se sorteó el número ' +
                       drawResult.drawnNumber +
-                      ' y el contexto se está refrescando.'
+                      ' y la consola se está sincronizando en segundo plano.'
                 }}
               </p>
             } @else if (facade.drawError()) {
@@ -388,7 +403,58 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
           </section>
         }
 
-                <p class="read-only-note" aria-live="polite">
+        @if (facade.lastDrawResult(); as lastDrawResult) {
+          <section
+            class="surface-card panel"
+            aria-live="polite"
+          >
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Sorteo visible</p>
+                <h3>Número sorteado</h3>
+                <p class="empty-copy">
+                  El motor conserva el contexto visible mientras sincroniza historial, counters y ganador.
+                </p>
+              </div>
+              <app-status-badge [tone]="lastDrawResult.winnerCreated ? 'success' : 'info'">
+                {{ lastDrawResult.winnerCreated ? 'Ganador detectado' : 'Sin ganador aún' }}
+              </app-status-badge>
+            </div>
+
+            <div
+              style="display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:var(--s4);align-items:center;"
+            >
+              <p
+                [class.live-draw-number--busy]="facade.drawSyncPending()"
+                [style.background]="lastDrawResult.winnerCreated ? '#dcfce7' : '#dbeafe'"
+                [style.color]="lastDrawResult.winnerCreated ? '#166534' : '#1d4ed8'"
+                style="margin:0;font-size:clamp(2.75rem,8vw,4.75rem);line-height:1;font-weight:900;text-align:center;border-radius:var(--r-lg);padding:var(--s4);"
+              >
+                {{ lastDrawResult.drawnNumber }}
+              </p>
+
+              <dl class="facts">
+                <div><dt>Secuencia</dt><dd>#{{ lastDrawResult.sequence }}</dd></div>
+                <div><dt>Venta</dt><dd>{{ drawOwnershipLabel(lastDrawResult.numberIsSold) }}</dd></div>
+                <div>
+                  <dt>Aciertos</dt>
+                  <dd>{{ lastDrawResult.currentHits }}/{{ lastDrawResult.hitsRequired }}</dd>
+                </div>
+                <div><dt>Estado del juego</dt><dd>{{ drawGameStatusLabel(lastDrawResult.gameStatus) }}</dd></div>
+                <div><dt>Resultado</dt><dd>{{ drawWinnerLabel(lastDrawResult) }}</dd></div>
+                <div><dt>Draw</dt><dd>{{ lastDrawResult.replay ? 'Replay idempotente' : 'Nuevo sorteo manual' }}</dd></div>
+              </dl>
+            </div>
+
+            @if (facade.drawSyncPending()) {
+              <p class="read-only-note" style="border:1px dashed var(--color-border);">
+                Actualizando historial, contadores y ganador sin ocultar la consola actual.
+              </p>
+            }
+          </section>
+        }
+
+        <p class="read-only-note" aria-live="polite">
           Las acciones operativas y las herramientas técnicas se separan visualmente. Rebuild
           counters solo aparece cuando el contrato backend real la soporta de forma explícita.
         </p>
@@ -514,8 +580,17 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                 <div><dt>Aciertos</dt><dd>{{ winner.winningHits }}</dd></div>
                 <div><dt>Ganó</dt><dd>{{ date(winner.wonAt) }}</dd></div>
               </dl>
+            } @else if (facade.lastDrawResult()?.winnerCreated) {
+              <p class="empty-copy">
+                <strong>Ganador detectado.</strong> Laravel indicó un ganador en el último sorteo y
+                estamos sincronizando su ficha final.
+              </p>
             } @else {
               <p class="empty-copy"><strong>Sin ganador aún.</strong> El backend todavía no reporta ganador para este juego.</p>
+            }
+
+            @if (facade.winnerRefreshing()) {
+              <p class="section-note">Actualizando estado del ganador…</p>
             }
           </article>
         </div>
@@ -529,13 +604,16 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                   Mostrando {{ snapshot.draws.length }} de {{ snapshot.drawsPageInfo.total }}
                   registros del endpoint admin real.
                 </p>
+                @if (facade.drawsRefreshing()) {
+                  <p class="empty-copy">Actualizando historial…</p>
+                }
               </div>
             </div>
 
             @if (snapshot.draws.length > 0) {
               <div class="draw-list" aria-label="Historial de extracciones">
                 @for (draw of snapshot.draws; track draw.id) {
-                  <article>
+                  <article [style.background]="draw.id === facade.lastDrawResult()?.drawId ? '#eff6ff' : null">
                     <strong>{{ draw.drawnNumber }}</strong>
                     <span>Secuencia #{{ draw.sequence }}</span>
                     <small>{{ draw.strategy }} · {{ date(draw.drawnAt) }}</small>
@@ -547,7 +625,11 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                   <button
                     class="button button--secondary"
                     type="button"
-                    [disabled]="snapshot.drawsPageInfo.currentPage === 1 || facade.status() === 'refreshing'"
+                    [disabled]="
+                      snapshot.drawsPageInfo.currentPage === 1 ||
+                      facade.status() === 'refreshing' ||
+                      facade.drawsRefreshing()
+                    "
                     (click)="facade.loadDrawsPage(snapshot.drawsPageInfo.currentPage - 1)"
                   >
                     Anterior
@@ -561,7 +643,8 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                     type="button"
                     [disabled]="
                       snapshot.drawsPageInfo.currentPage >= snapshot.drawsPageInfo.lastPage ||
-                      facade.status() === 'refreshing'
+                      facade.status() === 'refreshing' ||
+                      facade.drawsRefreshing()
                     "
                     (click)="facade.loadDrawsPage(snapshot.drawsPageInfo.currentPage + 1)"
                   >
@@ -582,13 +665,22 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                   Mostrando {{ snapshot.counters.length }} de {{ snapshot.countersPageInfo.total }}
                   filas del endpoint admin real.
                 </p>
+                @if (facade.countersRefreshing()) {
+                  <p class="empty-copy">Actualizando contadores…</p>
+                }
               </div>
             </div>
 
             @if (snapshot.counters.length > 0) {
               <div class="counter-list" aria-label="Contadores por número">
                 @for (counter of snapshot.counters; track counter.gameNumberId) {
-                  <article>
+                  <article
+                    [style.background]="
+                      counter.gameNumberId === facade.lastDrawResult()?.gameNumberId
+                        ? '#eff6ff'
+                        : null
+                    "
+                  >
                     <div class="counter-number">
                       <strong>{{ counter.number }}</strong>
                       <app-status-badge [tone]="counter.status.tone">
@@ -611,7 +703,11 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                   <button
                     class="button button--secondary"
                     type="button"
-                    [disabled]="snapshot.countersPageInfo.currentPage === 1 || facade.status() === 'refreshing'"
+                    [disabled]="
+                      snapshot.countersPageInfo.currentPage === 1 ||
+                      facade.status() === 'refreshing' ||
+                      facade.countersRefreshing()
+                    "
                     (click)="facade.loadCountersPage(snapshot.countersPageInfo.currentPage - 1)"
                   >
                     Anterior
@@ -625,7 +721,8 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
                     type="button"
                     [disabled]="
                       snapshot.countersPageInfo.currentPage >= snapshot.countersPageInfo.lastPage ||
-                      facade.status() === 'refreshing'
+                      facade.status() === 'refreshing' ||
+                      facade.countersRefreshing()
                     "
                     (click)="facade.loadCountersPage(snapshot.countersPageInfo.currentPage + 1)"
                   >
@@ -703,7 +800,6 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       color: var(--color-link);
       font-weight: 700;
       text-decoration: none;
-      overflow-wrap: anywhere;
     }
     .back-link:hover {
       color: var(--color-link-hover);
@@ -775,9 +871,6 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       margin: var(--s3) 0 0;
       padding-left: 1.15rem;
     }
-    .guidance-list li {
-      overflow-wrap: anywhere;
-    }
     .confirm-box {
       padding: var(--s4);
       border: 1px solid var(--color-border);
@@ -796,24 +889,11 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
       padding: var(--s3);
       border-radius: var(--r-md);
     }
-    .feedback--success {
-      background: #ecfdf3;
-      color: #067647;
-    }
-    .feedback--error {
-      background: #fff1f0;
-      color: #b42318;
-    }
-    .read-only-note {
-      margin: 0;
-      padding: var(--s3);
-      border-radius: var(--r-md);
-      background: var(--neutral-50);
-      color: var(--color-text-muted);
-    }
-    .operational-note p {
-      margin: 0;
-    }
+    .feedback--success { background: #ecfdf3; color: #067647; }
+    .feedback--error { background: #fff1f0; color: #b42318; }
+    .read-only-note { margin: 0; padding: var(--s3); border-radius: var(--r-md); background: var(--neutral-50); color: var(--color-text-muted); }
+    .live-draw-number--busy { transform: scale(1.03); transition: transform .2s ease; }
+    @media (prefers-reduced-motion: reduce) { .live-draw-number--busy { transform: none; transition: none; } }
     .summary-grid,
     .audit-grid {
       display: grid;
@@ -853,7 +933,6 @@ import { GameEngineConsoleView } from '../../models/game-engine.models';
     .empty-copy {
       margin: 0;
       color: var(--color-text-muted);
-      overflow-wrap: anywhere;
     }
     .draw-list,
     .counter-list {
@@ -1022,6 +1101,11 @@ export class GameEnginePage {
   readonly canDrawNumber = computed(() => {
     const context = this.facade.snapshot()?.context;
     if (context === undefined) {
+      return false;
+    }
+
+    const lastDrawResult = this.facade.lastDrawResult();
+    if (lastDrawResult?.winnerCreated || lastDrawResult?.gameStatus === 'completed') {
       return false;
     }
 
@@ -1317,6 +1401,27 @@ export class GameEnginePage {
     }
 
     return error.message;
+  }
+
+  drawOwnershipLabel(numberIsSold: boolean): string {
+    return numberIsSold
+      ? 'Este número pertenece a un cartón vendido'
+      : 'Este número no estaba vendido';
+  }
+
+  drawGameStatusLabel(gameStatus: 'running' | 'completed'): string {
+    return gameStatus === 'completed' ? 'Juego finalizado' : 'Juego en ejecución';
+  }
+
+  drawWinnerLabel(result: {
+    winnerCreated: boolean;
+    replay: boolean;
+  }): string {
+    if (result.winnerCreated) {
+      return 'Ganador detectado';
+    }
+
+    return result.replay ? 'Sin ganador nuevo; replay confirmado' : 'Sin ganador aún';
   }
 
   rebuildErrorMessage(): string {

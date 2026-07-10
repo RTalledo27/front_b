@@ -192,6 +192,22 @@ function createFacadeMock() {
       drawnAt: string;
       replay: boolean;
     } | null>(null),
+    lastDrawResult: signal<{
+      gameId: string;
+      drawId: string;
+      gameNumberId: string;
+      sequence: number;
+      drawnNumber: number;
+      currentHits: number;
+      hitsRequired: number;
+      numberIsSold: boolean;
+      winnerCreated: boolean;
+      winnerEntryId: string | null;
+      gameStatus: 'running' | 'completed';
+      drawnAt: string;
+      replay: boolean;
+    } | null>(null),
+    drawSyncPending: signal(false),
     rebuildStatus: signal<
       | 'idle'
       | 'submitting'
@@ -216,6 +232,11 @@ function createFacadeMock() {
       maxSequence: number;
       rebuiltAt: string;
     } | null>(null),
+    silentRefreshing: signal(false),
+    silentRefreshError: signal<{ message: string } | null>(null),
+    drawsRefreshing: signal(false),
+    countersRefreshing: signal(false),
+    winnerRefreshing: signal(false),
   };
 }
 
@@ -477,7 +498,7 @@ describe('GameEnginePage', () => {
   it('shows draw replay feedback when backend confirms the same command', async () => {
     const facade = createFacadeMock();
     facade.drawStatus.set('success');
-    facade.drawResult.set({
+    const result = {
       gameId: 'game-1',
       drawId: 'draw-1',
       gameNumberId: 'number-1',
@@ -488,19 +509,36 @@ describe('GameEnginePage', () => {
       numberIsSold: false,
       winnerCreated: false,
       winnerEntryId: null,
-      gameStatus: 'running',
+      gameStatus: 'running' as const,
       drawnAt: '2026-06-27T12:16:00Z',
       replay: true,
-    });
+    };
+    facade.drawResult.set(result);
+    facade.lastDrawResult.set(result);
 
     const fixture = await renderPage(facade);
     expect(fixture.nativeElement.textContent).toContain('replay del mismo sorteo manual');
+    expect(fixture.nativeElement.textContent).toContain('Número sorteado');
+    expect(fixture.nativeElement.textContent).toContain('Replay idempotente');
   });
 
-  it('shows draw success feedback with the drawn number', async () => {
+  it('shows a visible draw result without returning to the global loading state', async () => {
     const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'running', label: 'En ejecución', tone: 'info', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: { startedAt: '2026-06-27T12:05:00Z', pausedAt: null, completedAt: null },
+      },
+    });
     facade.drawStatus.set('success');
-    facade.drawResult.set({
+    facade.drawSyncPending.set(true);
+    const result = {
       gameId: 'game-1',
       drawId: 'draw-1',
       gameNumberId: 'number-1',
@@ -511,13 +549,75 @@ describe('GameEnginePage', () => {
       numberIsSold: false,
       winnerCreated: false,
       winnerEntryId: null,
-      gameStatus: 'running',
+      gameStatus: 'running' as const,
+      drawnAt: '2026-06-27T12:16:00Z',
+      replay: false,
+    };
+    facade.drawResult.set(result);
+    facade.lastDrawResult.set(result);
+
+    const fixture = await renderPage(facade);
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Se sorteó el número 19');
+    expect(text).toContain('Número sorteado');
+    expect(text).toContain('Secuencia');
+    expect(text).toContain('#1');
+    expect(text).toContain('Sin ganador aún');
+    expect(text).not.toContain('Cargando contexto del motor');
+    expect(text).toContain('Actualizando historial, contadores y ganador');
+    expect(
+      Array.from(fixture.nativeElement.querySelectorAll('button')).some((button) =>
+        (button as HTMLButtonElement).textContent?.includes('Sorteando…'),
+      ),
+    ).toBe(true);
+  });
+
+  it('shows immediate winner detection from the draw response before the winner refresh finishes', async () => {
+    const facade = createFacadeMock();
+    facade.snapshot.set({
+      ...facade.snapshot()!,
+      context: {
+        ...facade.snapshot()!.context,
+        status: { value: 'completed', label: 'Finalizado', tone: 'success', isKnown: true },
+        schedule: {
+          ...facade.snapshot()!.context.schedule,
+          autoDrawEnabled: false,
+        },
+        lifecycle: {
+          startedAt: '2026-06-27T12:05:00Z',
+          pausedAt: null,
+          completedAt: '2026-06-27T12:16:00Z',
+        },
+      },
+      winner: null,
+    });
+    facade.drawStatus.set('success');
+    facade.drawResult.set({
+      gameId: 'game-1',
+      drawId: 'draw-3',
+      gameNumberId: 'number-1',
+      sequence: 3,
+      drawnNumber: 17,
+      currentHits: 2,
+      hitsRequired: 2,
+      numberIsSold: true,
+      winnerCreated: true,
+      winnerEntryId: 'entry-1',
+      gameStatus: 'completed',
       drawnAt: '2026-06-27T12:16:00Z',
       replay: false,
     });
+    facade.lastDrawResult.set(facade.drawResult());
+    facade.winnerRefreshing.set(true);
 
     const fixture = await renderPage(facade);
-    expect(fixture.nativeElement.textContent).toContain('Se sorteó el número 19');
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Ganador detectado');
+    expect(text).toContain('Juego finalizado');
+    expect(text).toContain('Este número pertenece a un cartón vendido');
+    expect(text).toContain('Laravel indicó un ganador en el último sorteo');
   });
 
   it('shows draw conflict feedback when Laravel rejects the manual draw', async () => {

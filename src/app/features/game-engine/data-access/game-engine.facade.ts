@@ -7,6 +7,10 @@ import { AuthSessionService } from '../../../core/auth/services/auth-session.ser
 import { AdminGameDetailView } from '../../admin-games/models/admin-games.models';
 import { ADMIN_GAMES_REPOSITORY } from '../../admin-games/data-access/admin-games.repository';
 import {
+  buildAdminGameNumberStatus,
+  buildAdminGameStatus,
+} from '../../admin-games/utils/admin-games-display';
+import {
   GameEngineAccessMode,
   GameEngineConsoleView,
   GameEngineCounterView,
@@ -46,6 +50,11 @@ const FALLBACK_LINKS = {
   next: null,
 } as const;
 
+interface GameEngineLoadOptions {
+  silent?: boolean;
+  preserveSnapshotOnError?: boolean;
+}
+
 @Injectable()
 export class GameEngineFacade {
   private readonly adminGamesRepository = inject(ADMIN_GAMES_REPOSITORY);
@@ -80,14 +89,22 @@ export class GameEngineFacade {
   readonly drawStatus = signal<GameEngineDrawStatus>('idle');
   readonly drawError = signal<ApiError | null>(null);
   readonly drawResult = signal<GameEngineDrawCommandView | null>(null);
+  readonly lastDrawResult = signal<GameEngineDrawCommandView | null>(null);
+  readonly drawSyncPending = signal(false);
   readonly rebuildStatus = signal<GameEngineRebuildStatus>('idle');
   readonly rebuildError = signal<ApiError | null>(null);
   readonly rebuildResult = signal<GameEngineRebuildCountersCommandView | null>(null);
+  readonly silentRefreshing = signal(false);
+  readonly silentRefreshError = signal<ApiError | null>(null);
+  readonly drawsRefreshing = signal(false);
+  readonly countersRefreshing = signal(false);
+  readonly winnerRefreshing = signal(false);
 
   load(
     gameId: string,
     accessMode: GameEngineAccessMode,
     pages?: { drawsPage?: number; countersPage?: number },
+    options?: GameEngineLoadOptions,
   ): void {
     const normalizedGameId = gameId.trim();
     if (normalizedGameId === '') {
@@ -101,6 +118,8 @@ export class GameEngineFacade {
     const nextCountersPage = sanitizePage(
       pages?.countersPage ?? (isGameChanged ? 1 : this.activeCountersPage),
     );
+    const shouldSilentRefresh = options?.silent === true && hasLoadedSnapshot;
+    const preserveSnapshotOnError = options?.preserveSnapshotOnError === true && hasLoadedSnapshot;
 
     if (isGameChanged) {
       this.resetCommandState();
@@ -112,7 +131,15 @@ export class GameEngineFacade {
     this.loadSequence += 1;
     this.accessMode.set(accessMode);
     this.error.set(null);
-    this.status.set(hasLoadedSnapshot ? 'refreshing' : 'loading');
+    this.silentRefreshError.set(null);
+
+    if (shouldSilentRefresh) {
+      this.status.set('loaded');
+      this.setSilentRefreshState(true);
+    } else {
+      this.setSilentRefreshState(false);
+      this.status.set(hasLoadedSnapshot ? 'refreshing' : 'loading');
+    }
 
     if (!hasLoadedSnapshot) {
       this.snapshot.set(null);
@@ -147,6 +174,9 @@ export class GameEngineFacade {
             winner,
           });
           this.error.set(null);
+          this.silentRefreshError.set(null);
+          this.setSilentRefreshState(false);
+          this.drawSyncPending.set(false);
           this.status.set('loaded');
         },
         error: (error: unknown) => {
@@ -155,8 +185,19 @@ export class GameEngineFacade {
           }
 
           const apiError = toApiError(error);
+          this.setSilentRefreshState(false);
+          this.drawSyncPending.set(false);
+
+          if (preserveSnapshotOnError && this.snapshot()?.context.id === normalizedGameId) {
+            this.error.set(null);
+            this.silentRefreshError.set(apiError);
+            this.status.set('loaded');
+            return;
+          }
+
           this.snapshot.set(null);
           this.error.set(apiError);
+          this.silentRefreshError.set(null);
           this.status.set(resolveGameEngineStatus(apiError));
         },
       });
@@ -167,6 +208,9 @@ export class GameEngineFacade {
       this.load(this.activeGameId, this.accessMode(), {
         drawsPage: this.activeDrawsPage,
         countersPage: this.activeCountersPage,
+      }, {
+        silent: true,
+        preserveSnapshotOnError: true,
       });
     }
   }
@@ -222,6 +266,8 @@ export class GameEngineFacade {
 
   private resetCommandState(): void {
     this.drawCommandIds.clear();
+    this.setSilentRefreshState(false);
+    this.silentRefreshError.set(null);
     this.startStatus.set('idle');
     this.startError.set(null);
     this.startResult.set(null);
@@ -234,6 +280,8 @@ export class GameEngineFacade {
     this.drawStatus.set('idle');
     this.drawError.set(null);
     this.drawResult.set(null);
+    this.lastDrawResult.set(null);
+    this.drawSyncPending.set(false);
     this.rebuildStatus.set('idle');
     this.rebuildError.set(null);
     this.rebuildResult.set(null);
@@ -380,6 +428,8 @@ export class GameEngineFacade {
     this.drawStatus.set('submitting');
     this.drawError.set(null);
     this.drawResult.set(null);
+    this.silentRefreshError.set(null);
+    this.drawSyncPending.set(false);
 
     this.repository
       .drawNumber(gameId, commandId)
@@ -392,8 +442,11 @@ export class GameEngineFacade {
 
           this.drawCommandIds.clear();
           this.drawResult.set(result);
+          this.lastDrawResult.set(result);
           this.drawError.set(null);
           this.drawStatus.set('success');
+          this.applyDrawResultToSnapshot(result);
+          this.drawSyncPending.set(true);
           this.refresh();
         },
         error: (error: unknown) => {
@@ -405,6 +458,7 @@ export class GameEngineFacade {
           this.drawResult.set(null);
           this.drawError.set(apiError);
           this.drawStatus.set(resolveCommandStatus(apiError));
+          this.drawSyncPending.set(false);
 
           if (shouldClearDrawCommandId(apiError)) {
             this.drawCommandIds.clear();
@@ -465,6 +519,101 @@ export class GameEngineFacade {
         throw error;
       }),
     );
+  }
+
+  private applyDrawResultToSnapshot(result: GameEngineDrawCommandView): void {
+    const currentSnapshot = this.snapshot();
+    if (currentSnapshot === null || currentSnapshot.context.id !== result.gameId) {
+      return;
+    }
+
+    const existingDrawIndex = currentSnapshot.draws.findIndex((draw) => draw.id === result.drawId);
+    const nextDraw = {
+      id: result.drawId,
+      gameId: result.gameId,
+      gameNumberId: result.gameNumberId,
+      sequence: result.sequence,
+      drawnNumber: result.drawnNumber,
+      strategy: 'manual',
+      drawnAt: result.drawnAt,
+    } satisfies GameEngineDrawView;
+
+    let draws = currentSnapshot.draws;
+    let drawsPageInfo = currentSnapshot.drawsPageInfo;
+
+    if (currentSnapshot.drawsPageInfo.currentPage === 1) {
+      if (existingDrawIndex === -1) {
+        draws = [nextDraw, ...currentSnapshot.draws].slice(0, currentSnapshot.drawsPageInfo.perPage);
+      } else {
+        draws = [...currentSnapshot.draws];
+        draws.splice(existingDrawIndex, 1);
+        draws.unshift(nextDraw);
+      }
+
+      const nextTotal =
+        existingDrawIndex === -1
+          ? Math.max(currentSnapshot.drawsPageInfo.total + 1, result.sequence)
+          : Math.max(currentSnapshot.drawsPageInfo.total, result.sequence);
+
+      drawsPageInfo = {
+        ...currentSnapshot.drawsPageInfo,
+        from: draws.length === 0 ? null : 1,
+        to: draws.length === 0 ? null : draws.length,
+        total: nextTotal,
+      };
+    }
+
+    const counters = currentSnapshot.counters.map((counter) =>
+      counter.gameNumberId === result.gameNumberId
+        ? {
+            ...counter,
+            hitsCount: result.currentHits,
+            lastDrawSequence: result.sequence,
+            status: result.numberIsSold ? buildAdminGameNumberStatus('sold') : counter.status,
+          }
+        : counter,
+    );
+
+    const nextStatus =
+      currentSnapshot.context.status.value === result.gameStatus
+        ? currentSnapshot.context.status
+        : buildAdminGameStatus(result.gameStatus);
+
+    this.snapshot.set({
+      ...currentSnapshot,
+      context: {
+        ...currentSnapshot.context,
+        status: nextStatus,
+        latestDraw: {
+          number: result.drawnNumber,
+          sequence: result.sequence,
+          drawnAt: result.drawnAt,
+        },
+        lifecycle: {
+          ...currentSnapshot.context.lifecycle,
+          completedAt:
+            result.gameStatus === 'completed'
+              ? (currentSnapshot.context.lifecycle.completedAt ?? result.drawnAt)
+              : currentSnapshot.context.lifecycle.completedAt,
+        },
+        projection: {
+          ...currentSnapshot.context.projection,
+          drawsTotal: Math.max(currentSnapshot.context.projection.drawsTotal, result.sequence),
+          maxCounterHits: Math.max(currentSnapshot.context.projection.maxCounterHits, result.currentHits),
+          lastDrawnNumber: result.drawnNumber,
+        },
+      },
+      draws,
+      drawsPageInfo,
+      counters,
+    });
+  }
+
+  private setSilentRefreshState(isRefreshing: boolean): void {
+    this.silentRefreshing.set(isRefreshing);
+    this.drawsRefreshing.set(isRefreshing);
+    this.countersRefreshing.set(isRefreshing);
+    this.winnerRefreshing.set(isRefreshing);
   }
 
   private isCurrentRequest(sequence: number, gameId: string, requestUserId: number | null): boolean {
