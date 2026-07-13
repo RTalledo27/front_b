@@ -354,3 +354,12 @@ Orden sugerido:
 1. B12 — endurecimiento de release real y empaquetado operacional
 2. smoke guiado final con datos de demo congelados
 3. cierre de gaps de entorno externos: correo/OAuth si se necesitarán en demo pública
+
+## 19. Runtime representativo definido en B18
+
+La demo/release técnica ya no usa Artisan Serve como referencia. B18 incorpora
+un runtime Nginx + PHP-FPM inmutable, migración one-shot, healthchecks y
+`APP_ENV=production`/`APP_DEBUG=false`. Artisan host queda para demo local rápida
+cuando importa el feedback de Windows, y Artisan Docker queda para desarrollo
+reproducible. Consultar `docs/runtime-environment-parity.md` antes de preparar
+un entorno compartido.

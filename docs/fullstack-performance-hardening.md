@@ -194,3 +194,12 @@ desde host a Docker se debe recrear `app`; su comando de inicio ejecuta
 B17 puede cerrarse: hay baseline repetido, causa raíz identificada, mejoras
 medibles, rutas autenticadas warm por debajo del riesgo histórico, contratos y
 seguridad preservados, y experiencia live estable.
+
+## Actualización B18
+
+B18 confirma que Artisan Serve, incluso con cuatro workers, es únicamente un
+runtime de desarrollo. Para demo/release se adopta Nginx + PHP-FPM sin bind
+mount, con OPcache release: el lote motor warm bajó de `3.472 s` a `0.071 s` y
+la imagen consume aproximadamente `48 MiB` entre FPM y Nginx. El modo host de
+B17 sigue siendo la opción de edición rápida en Windows. La matriz completa y
+los comandos están en `docs/runtime-environment-parity.md`.
