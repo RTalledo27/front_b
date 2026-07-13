@@ -29,11 +29,11 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
 
       @if (facade.refreshError() && facade.items().length) {
         <section class="surface-card live-notice" aria-live="polite">
-          No pudimos actualizar el progreso live en este momento. Conservamos el último avance visible.
+          No pudimos actualizar el progreso en vivo. Conservamos el último avance visible.
         </section>
       } @else if (facade.refreshing() && facade.items().length) {
         <section class="surface-card live-notice" aria-live="polite">
-          Actualizando progreso live de tus cartones…
+          Actualizando tus cartones…
         </section>
       }
 
@@ -96,7 +96,9 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                     <strong>{{ liveProgressHeading(progress.gameStatus) }}</strong>
                     <p>{{ liveProgressBody(progress) }}</p>
                     @if (progress.hitsRequired !== null) {
-                      <small>Aciertos reales: {{ progress.hitsCurrent }}/{{ progress.hitsRequired }}</small>
+                      <strong class="entry__score">
+                        Aciertos: {{ progress.hitsCurrent }}/{{ progress.hitsRequired }}
+                      </strong>
                     }
                     @if (progress.latestDrawNumber !== null && progress.latestDrawSequence !== null) {
                       <small>
@@ -108,7 +110,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                         {{
                           liveGameState.schedule.nextDrawAt
                             ? 'Próxima referencia ' + date(liveGameState.schedule.nextDrawAt)
-                            : 'El backend actualizará el progreso en la siguiente extracción.'
+                            : 'El progreso se actualizará con la siguiente extracción.'
                         }}
                       </small>
                     } @else if (progress.gameStatus === 'completed' && progress.wonAt) {
@@ -120,7 +122,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                       @if (liveGameState.latestDraw; as latestDraw) {
                         Último número sorteado: {{ latestDraw.number }} · sorteo #{{ latestDraw.sequence }}
                       } @else {
-                        El backend todavía no publicó un último sorteo visible.
+                        Aún no hay un último sorteo publicado.
                       }
                     </p>
                     <small>La actualización de aciertos depende del estado publicado por el juego.</small>
@@ -137,7 +139,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
                       @if (liveGameState.winner; as winner) {
                         Ganó el número {{ winner.number }} con {{ winner.hits }} aciertos.
                       } @else {
-                        El backend todavía no publicó ganador en el contrato público.
+                        El resultado ganador todavía no está disponible.
                       }
                     </p>
                   } @else {
@@ -148,7 +150,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
               } @else {
                 <div class="entry__live entry__live--muted">
                   <strong>Cartón confirmado</strong>
-                  <p>Tu cartón está confirmado. La actualización de aciertos depende del estado publicado por el juego.</p>
+                  <p>Tu cartón está confirmado. Mostraremos su avance cuando el juego lo publique.</p>
                 </div>
               }
 
@@ -174,6 +176,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
     .entry__live{display:grid;gap:var(--s1);padding:var(--s3);border-radius:var(--r-md);background:var(--color-surface-subtle)}
     .entry__live--muted{border:1px dashed var(--color-border);background:transparent}
     .entry__live strong,.entry__live p,.entry__live small{margin:0}
+    .entry__score{color:var(--color-brand);font-size:var(--xl);line-height:1.2}
     .entry__live p,.entry__live small,.live-notice{color:var(--color-text-muted)}
     .entry__actions a{color:var(--color-link);font-weight:750}
     .live-notice{margin-bottom:var(--s4);padding:var(--s4)}
@@ -248,7 +251,7 @@ export class PlayerEntriesPage {
 
   liveProgressBody(progress: NonNullable<PlayerEntryView['liveProgress']>): string {
     if (progress.isWinner) {
-      return 'Tu cartón alcanzó el resultado ganador con datos reales del backend.';
+      return 'Tu cartón alcanzó el resultado ganador.';
     }
 
     if (progress.gameStatus === 'completed') {
@@ -256,9 +259,9 @@ export class PlayerEntriesPage {
     }
 
     if (progress.gameStatus === 'running') {
-      return 'Este cartón sigue participando y su avance se calcula con draws reales del backend.';
+      return 'Este cartón sigue participando y avanza con cada número sorteado.';
     }
 
-    return 'El cartón está confirmado y el backend publicará más avance cuando el juego corra.';
+    return 'El cartón está confirmado y mostrará su avance cuando comience el juego.';
   }
 }

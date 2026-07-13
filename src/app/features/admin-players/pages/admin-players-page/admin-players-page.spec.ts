@@ -60,6 +60,16 @@ describe('AdminPlayersPage', () => {
     expect(facade.submit).not.toHaveBeenCalled();
   });
 
+  it('uses operational copy instead of exposing the HTTP contract in the empty state', async () => {
+    const { fixture } = await renderPage();
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('Datos del jugador');
+    expect(text).toContain('Resultado de la invitación');
+    expect(text).not.toContain('POST /api/v1/admin/players');
+    expect(text).not.toContain('outcome real');
+  });
+
   it('submits a trimmed and normalized payload', async () => {
     const { fixture, facade } = await renderPage();
 

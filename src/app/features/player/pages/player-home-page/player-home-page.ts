@@ -18,11 +18,8 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
     <header class="hero surface-card">
       <div class="hero__copy">
         <p class="eyebrow">Hola, {{ facade.user()?.name ?? 'jugador' }}</p>
-        <h1>Tu actividad real en Fortuna</h1>
-        <p>
-          Esta home se compone con tus órdenes, reservas y cartones reales del backend, sin
-          métricas inventadas.
-        </p>
+        <h1>Tu actividad en Fortuna</h1>
+        <p>Consulta en un solo lugar tus compras, reservas y cartones confirmados.</p>
 
         <div class="hero__actions">
           <a class="button" routerLink="/bingos">Explorar bingos</a>
@@ -65,7 +62,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
     @if (facade.pageStatus() === 'loading') {
       <section class="surface-card data-state" aria-busy="true" aria-live="polite">
         <span class="data-loader"></span>
-        <p>Cargando tu actividad real…</p>
+        <p>Cargando tu actividad…</p>
       </section>
     } @else {
       @if (facade.pageStatus() === 'partial') {
@@ -85,7 +82,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
         facade.pageStatus() === 'unexpectedError'
       ) {
         <section class="surface-card data-state" role="alert">
-          <h2>No pudimos construir tu home real</h2>
+          <h2>No pudimos cargar tu actividad</h2>
           <p>{{ facade.primaryErrorMessage() }}</p>
           <button class="button" type="button" (click)="facade.load()">Reintentar</button>
         </section>
@@ -93,8 +90,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
         <section class="surface-card data-state">
           <h2>Aún no tienes actividad disponible</h2>
           <p>
-            Cuando registres órdenes, reservas activas o cartones confirmados, aparecerán aquí con
-            datos reales.
+            Cuando registres órdenes, reservas activas o cartones confirmados, aparecerán aquí.
           </p>
           <a class="button" routerLink="/bingos">Explorar bingos</a>
         </section>
@@ -118,7 +114,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
                       @if (game.latestDraw; as latestDraw) {
                         Último número sorteado: {{ latestDraw.number }} · sorteo #{{ latestDraw.sequence }}
                       } @else {
-                        El juego ya está corriendo, pero el backend todavía no publicó un último sorteo.
+                        El juego ya está corriendo, pero todavía no hay un último sorteo publicado.
                       }
                     </p>
                   </div>
@@ -142,7 +138,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
           </section>
         }
 
-        <section class="summary-grid" aria-label="Resumen de actividad real">
+        <section class="summary-grid" aria-label="Resumen de actividad">
           <article class="surface-card summary-card">
             <p class="eyebrow">Órdenes</p>
             <strong>{{ facade.ordersTotal() }}</strong>
@@ -204,7 +200,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
             <header>
               <div>
                 <p class="eyebrow">Órdenes recientes</p>
-                <h2>Estado real de compras</h2>
+                <h2>Estado de tus compras</h2>
               </div>
               <a class="button button--secondary" routerLink="/jugador/compras">Ver todas</a>
             </header>
@@ -298,7 +294,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
             <header>
               <div>
                 <p class="eyebrow">Cartones confirmados</p>
-                <h2>Entradas reales del jugador</h2>
+                <h2>Cartones confirmados</h2>
               </div>
               <a class="button button--secondary" routerLink="/jugador/cartones">Ver todos</a>
             </header>
@@ -317,7 +313,7 @@ import { PlayerHomeFacade } from '../../data-access/player-home.facade';
                       </strong>
                       <p>{{ entry.game?.name ?? 'Juego sin nombre disponible' }}</p>
                       @if (entry.liveProgress?.hitsRequired !== null) {
-                        <p>{{ entry.liveProgress?.hitsCurrent }}/{{ entry.liveProgress?.hitsRequired }} aciertos reales</p>
+                        <p>{{ entry.liveProgress?.hitsCurrent }}/{{ entry.liveProgress?.hitsRequired }} aciertos</p>
                       }
                     </div>
                     <div class="list-row__meta">
@@ -622,6 +618,6 @@ export class PlayerHomePage {
       return `Aún no tienes ${label} para mostrar en esta home.`;
     }
 
-    return message ?? `No pudimos recuperar tus ${label} desde el backend.`;
+    return message ?? `No pudimos recuperar tus ${label}.`;
   }
 }

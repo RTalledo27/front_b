@@ -37,7 +37,7 @@ function createFacadeMock() {
 }
 
 describe('PlayerOrdersPage', () => {
-  it('shows the real order id instead of a synthetic short reference', async () => {
+  it('shows the complete order identifier with user-facing context', async () => {
     const facade = createFacadeMock();
 
     await TestBed.configureTestingModule({
@@ -53,8 +53,9 @@ describe('PlayerOrdersPage', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('ID real 01977abc-0000-7000-8000-000000000201');
+    expect(text).toContain('Identificador de orden 01977abc-0000-7000-8000-000000000201');
     expect(text).not.toContain('Orden 01977ABC');
+    expect(text).not.toContain('p. m..');
   });
 
   it('shows the login CTA when the backend requires authentication', async () => {

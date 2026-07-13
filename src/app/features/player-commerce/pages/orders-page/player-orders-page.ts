@@ -16,7 +16,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
         <div>
           <p class="eyebrow">Compras</p>
           <h1>Mis órdenes</h1>
-          <p>Consulta el estado real de tus reservas y órdenes del backend.</p>
+          <p>Consulta el estado de tus compras y revisa cada operación en detalle.</p>
         </div>
         <a class="button" routerLink="/bingos">Explorar bingos</a>
       </header>
@@ -69,7 +69,7 @@ import { StatusBadge } from '../../../../shared/ui/status-badge/status-badge';
           @for (order of facade.orders(); track order.id) {
             <article class="surface-card order-card">
               <div>
-                <small>ID real {{ order.reference }}</small>
+                <small>Identificador de orden {{ order.reference }}</small>
                 <h2>{{ order.itemCount }} {{ order.itemCount === 1 ? 'número' : 'números' }}</h2>
                 <p>{{ summaryLine(order) }}</p>
               </div>
@@ -145,11 +145,11 @@ export class PlayerOrdersPage {
 
   summaryLine(order: PlayerOrderSummary): string {
     if (order.createdAt !== null) {
-      return `Creada ${this.date(order.createdAt)}.`;
+      return `Creada ${this.date(order.createdAt)}`;
     }
 
     if (order.validity === 'active' && order.expiresAt !== null) {
-      return `Reserva activa hasta ${this.date(order.expiresAt)}.`;
+      return `Reserva activa hasta ${this.date(order.expiresAt)}`;
     }
 
     return 'Consulta el detalle para revisar el estado operativo.';

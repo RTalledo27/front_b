@@ -14,11 +14,7 @@ import { AdminPlayerInviteOutcome } from '../../models/admin-players.models';
       <div>
         <p class="eyebrow">Onboarding administrativo</p>
         <h1>Crear o reinvitar jugador</h1>
-        <p>
-          Este bloque usa exclusivamente <code>POST /api/v1/admin/players</code>. No existe todavía un
-          listado administrativo paginado de usuarios, así que esta vista se concentra en la
-          invitación asistida real.
-        </p>
+        <p>Crea el acceso de un jugador o renueva su invitación usando su nombre y correo.</p>
       </div>
       <a class="button button--secondary" routerLink="/admin/dashboard">Volver al resumen</a>
     </header>
@@ -26,11 +22,8 @@ import { AdminPlayerInviteOutcome } from '../../models/admin-players.models';
     <div class="layout-grid">
       <section class="surface-card form-card">
         <header>
-          <h2>Formulario real</h2>
-          <p>
-            Laravel solo acepta <code>name</code> y <code>email</code>; cualquier otro campo
-            queda fuera de alcance.
-          </p>
+          <h2>Datos del jugador</h2>
+          <p>Completa la información necesaria para crear o renovar el acceso.</p>
         </header>
 
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -78,8 +71,8 @@ import { AdminPlayerInviteOutcome } from '../../models/admin-players.models';
 
       <section class="surface-card result-card">
         <header>
-          <h2>Resultado del backend</h2>
-          <p>La pantalla muestra solo lo que Laravel devuelve realmente.</p>
+          <h2>Resultado de la invitación</h2>
+          <p>Revisa aquí el estado de la cuenta y de su invitación.</p>
         </header>
 
         @if (facade.result(); as result) {
@@ -112,7 +105,7 @@ import { AdminPlayerInviteOutcome } from '../../models/admin-players.models';
             @if (result.invitation !== null) {
               <div class="result-panel">
                 <h3>Invitación activa</h3>
-                <p>Laravel devolvió una invitación vigente para el jugador.</p>
+                <p>Hay una invitación vigente para este jugador.</p>
                 <dl class="result-grid">
                   <div>
                     <dt>ID de invitación</dt>
@@ -127,36 +120,27 @@ import { AdminPlayerInviteOutcome } from '../../models/admin-players.models';
             } @else {
               <div class="result-panel">
                 <h3>Sin invitación nueva</h3>
-                <p>
-                  El backend respondió sin <code>invitation</code>, así que no se generó un token
-                  nuevo.
-                </p>
+                <p>No se generó una invitación nueva para esta cuenta.</p>
               </div>
             }
 
             @if (result.plainToken !== null) {
               <div class="result-panel">
                 <h3>Token visible en este entorno</h3>
-                <p>
-                  El backend expuso <code>plain_token</code> en este ambiente. No asumimos que
-                  exista en producción.
-                </p>
+                <p>Este entorno mostró un token de activación. Compártelo solo por un canal seguro.</p>
                 <textarea readonly rows="4">{{ result.plainToken }}</textarea>
               </div>
             } @else {
               <div class="result-panel">
                 <h3>Token no expuesto</h3>
-                <p>Laravel no devolvió <code>plain_token</code> en este entorno.</p>
+                <p>No hay un token visible para esta operación.</p>
               </div>
             }
           </div>
         } @else {
           <div class="empty-state">
             <h3>Sin resultado todavía</h3>
-            <p>
-              Aquí aparecerá el outcome real de <code>admin/players</code> después de crear o
-              reinvitar un jugador.
-            </p>
+            <p>Aquí verás si la cuenta fue creada, reinvitada o ya estaba registrada.</p>
           </div>
         }
       </section>

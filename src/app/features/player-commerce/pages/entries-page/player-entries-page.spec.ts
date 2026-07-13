@@ -129,8 +129,9 @@ describe('PlayerEntriesPage', () => {
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Progreso en vivo');
-    expect(text).toContain('1/5');
+    expect(text).toContain('Aciertos: 1/5');
     expect(text).toContain('Último número sorteado: 11');
+    expect(fixture.nativeElement.querySelector('.entry__score')).not.toBeNull();
   });
 
   it('keeps the last visible data when a silent refresh fails', async () => {

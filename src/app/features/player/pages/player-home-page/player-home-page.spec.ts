@@ -281,7 +281,7 @@ describe('PlayerHomePage', () => {
 
     expect(facade.load).toHaveBeenCalledTimes(1);
     expect(text).toContain('Hola, Andrea Real');
-    expect(text).toContain('Tu actividad real en Fortuna');
+    expect(text).toContain('Tu actividad en Fortuna');
     expect(text).toContain('Bingo Real');
     expect(text).toContain('2/5 aciertos');
     expect(text).not.toContain('S/ 2,000');
@@ -332,7 +332,7 @@ describe('PlayerHomePage', () => {
     const { fixture } = await renderPage(facade);
 
     expect(fixture.nativeElement.textContent).toContain('Aún no tienes actividad disponible');
-    expect(fixture.nativeElement.textContent).toContain('datos reales');
+    expect(fixture.nativeElement.textContent).toContain('aparecerán aquí');
   });
 
   it('keeps visible partial data and names the failed sections when one endpoint falls back to error', async () => {
@@ -363,7 +363,7 @@ describe('PlayerHomePage', () => {
 
     const { fixture } = await renderPage(facade);
 
-    expect(fixture.nativeElement.textContent).toContain('No pudimos construir tu home real');
+    expect(fixture.nativeElement.textContent).toContain('No pudimos cargar tu actividad');
     expect(fixture.nativeElement.textContent).toContain('Reintentar');
   });
 });
