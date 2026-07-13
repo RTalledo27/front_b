@@ -37,6 +37,7 @@ export class PlayerHomeFacade {
   private readonly session = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
   private liveVersion = 0;
+  private composingLoad = false;
 
   readonly orders = signal<readonly PlayerOrderSummary[]>([]);
   readonly ordersTotal = signal(0);
@@ -125,9 +126,12 @@ export class PlayerHomeFacade {
   });
 
   load(): void {
+    this.composingLoad = true;
     this.loadOrders();
     this.loadReservations();
     this.loadEntries();
+    this.composingLoad = false;
+    this.refreshLiveGames();
   }
 
   reloadOrders(): void {
@@ -253,6 +257,7 @@ export class PlayerHomeFacade {
     this.reservationsTotal.set(0);
     this.reservationsError.set(apiError);
     this.reservationsStatus.set(resolveReadStatus(apiError.status));
+    this.refreshLiveGames();
   }
 
   private applyEntriesError(apiError: ApiError): void {
@@ -272,6 +277,14 @@ export class PlayerHomeFacade {
   }
 
   private refreshLiveGames(): void {
+    if (
+      this.composingLoad ||
+      this.reservationsStatus() === 'loading' ||
+      this.entriesStatus() === 'loading'
+    ) {
+      return;
+    }
+
     const targets = new Map<string, string>();
 
     for (const reservation of this.reservations()) {

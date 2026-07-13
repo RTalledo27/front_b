@@ -52,6 +52,15 @@ Estado técnico verificado en este cierre:
 
 Hay dos modos válidos y deben documentarse sin ambigüedad.
 
+Decisión de performance B17:
+
+- para una demo local fluida en Windows, usar Laravel en el host con
+  PostgreSQL/Redis en Docker; las rutas warm medidas quedaron entre 0.2 y 0.6 s;
+- para reproducibilidad integral, usar Laravel dentro de Docker. El servicio
+  `app` usa cuatro workers y `--no-reload`, aunque el bind mount de Windows
+  mantiene un TTFB mayor;
+- no mantener ambos servidores ocupando el puerto 8000 al mismo tiempo.
+
 ### Opción A — Laravel local + PostgreSQL/Redis en Docker
 
 Usar esta opción si se levanta Laravel con `php artisan serve` o `php.exe -S`.
@@ -89,6 +98,13 @@ Estado observado en este cierre:
 - `rifas_app` arriba en `0.0.0.0:8000->8000`
 - `rifas_postgres` arriba en `0.0.0.0:55432->5432`
 - `rifas_redis` arriba
+
+El número de workers puede configurarse sin editar archivos:
+
+```powershell
+$env:PHP_CLI_SERVER_WORKERS="4"
+docker compose up -d --force-recreate app
+```
 
 ## 5. Cómo levantar frontend local
 

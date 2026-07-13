@@ -300,7 +300,9 @@ describe('PlayerHomeFacade', () => {
     expect(facade.latestOrder()?.id).toBe('order-1');
     expect(facade.latestReservation()?.gameNumber.number).toBe(7);
     expect(facade.latestEntry()?.game?.name).toBe('Fortuna Final');
-    expect(publicGamesRepository.getBySlug).toHaveBeenCalled();
+    expect(publicGamesRepository.getBySlug).toHaveBeenCalledTimes(2);
+    expect(publicGamesRepository.getBySlug).toHaveBeenCalledWith('bingo-real');
+    expect(publicGamesRepository.getBySlug).toHaveBeenCalledWith('fortuna-final');
   });
 
   it('shows an honest empty state when the three player endpoints return zero records', async () => {
@@ -374,7 +376,7 @@ describe('PlayerHomeFacade', () => {
     const reservations$ = new Subject<ReturnType<typeof buildReservationsResponse>>();
     const entries$ = new Subject<ReturnType<typeof buildEntriesResponse>>();
 
-    const { facade, repository } = await configureFacade({
+    const { facade, repository, publicGamesRepository } = await configureFacade({
       listOrders: vi.fn(() => orders$.asObservable()),
       listReservations: vi.fn(() => reservations$.asObservable()),
       listEntries: vi.fn(() => entries$.asObservable()),
@@ -386,15 +388,18 @@ describe('PlayerHomeFacade', () => {
     expect(repository.listOrders).toHaveBeenCalledTimes(1);
     expect(repository.listReservations).toHaveBeenCalledTimes(1);
     expect(repository.listEntries).toHaveBeenCalledTimes(1);
+    expect(publicGamesRepository.getBySlug).not.toHaveBeenCalled();
 
     orders$.next(buildOrdersResponse());
     orders$.complete();
     reservations$.next(buildReservationsResponse());
     reservations$.complete();
+    expect(publicGamesRepository.getBySlug).not.toHaveBeenCalled();
     entries$.next(buildEntriesResponse());
     entries$.complete();
 
     expect(facade.pageStatus()).toBe('loaded');
+    expect(publicGamesRepository.getBySlug).toHaveBeenCalledTimes(2);
   });
 
   it('turns malformed payloads into a controlled unexpected error instead of leaving loading stuck', async () => {
