@@ -38,6 +38,7 @@ function createFacadeMock() {
     load: vi.fn(),
     toggle: vi.fn(),
     clearSelection: vi.fn(),
+    refreshAvailability: vi.fn(),
     submitReservation: vi.fn(),
     isSelected: vi.fn((key: string) => key === '01977abc-0000-7000-8000-000000000011'),
     game: signal<PublicGame>(baseGame),
@@ -241,6 +242,35 @@ describe('NumberSelectionPage', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Necesitas verificar tu correo antes de reservar números reales.');
     expect(fixture.nativeElement.textContent).toContain('Verificar mi correo');
+  });
+
+  it('keeps the number grid visible and offers retry when a silent refresh fails', async () => {
+    const facade = createFacadeMock();
+    facade.viewError.set({ message: 'Sin conexión.' });
+
+    await TestBed.configureTestingModule({
+      imports: [NumberSelectionPage],
+      providers: [
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: new Map([['slug', 'bingo-fortuna']]) } } },
+      ],
+    })
+      .overrideComponent(NumberSelectionPage, {
+        set: { providers: [{ provide: NumberSelectionFacade, useValue: facade }] },
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(NumberSelectionPage);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.number')).toHaveLength(2);
+    expect(fixture.nativeElement.textContent).toContain('Conservamos la última grilla visible.');
+
+    const retryButton = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Reintentar actualización'),
+    );
+    retryButton?.click();
+
+    expect(facade.refreshAvailability).toHaveBeenCalledOnce();
   });
 
   it('explains that the board is no longer a purchase flow once the game is already running', async () => {

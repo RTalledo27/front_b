@@ -351,6 +351,29 @@ describe('NumberSelectionFacade', () => {
     expect(facade.liveMessage()).toContain('selección');
   });
 
+  it('preserves the last grid and selection when a silent availability refresh fails', () => {
+    let availabilityCall = 0;
+    const numbersRepository: GameNumbersRepository = {
+      getAvailability: vi.fn(() => {
+        availabilityCall += 1;
+        return availabilityCall === 1
+          ? of(availability)
+          : throwError(() => new HttpErrorResponse({ status: 0, error: new ProgressEvent('network') }));
+      }),
+      reserveNumbers: vi.fn(() => of(successResponse)),
+    };
+    const { facade } = configureFacade({ numbersRepository });
+    facade.load(game.slug);
+    facade.toggle(availability.numbers[0]);
+
+    facade.refreshAvailability();
+
+    expect(facade.viewStatus()).toBe('loaded');
+    expect(facade.numbers()).toEqual(availability.numbers);
+    expect(facade.selectedNumbers().map((item) => item.number)).toEqual([1]);
+    expect(facade.viewError()?.status).toBe(0);
+  });
+
   it('keeps the same key after a network error and reuses it on retry until the replay succeeds', () => {
     const idempotency = createIdempotencyMock();
     const numbersRepository: GameNumbersRepository = {

@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -58,6 +58,29 @@ describe('authErrorInterceptor', () => {
     http.expectOne(`${apiBaseUrl}/admin/orders`).flush({}, { status: 403, statusText: 'Forbidden' });
 
     expect(navigateByUrlSpy).toHaveBeenCalledWith('/403');
+  });
+
+  it('leaves email verification 403 responses to the feature that owns the recovery CTA', () => {
+    const navigateByUrlSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    let receivedStatus: number | null = null;
+
+    client.post(`${apiBaseUrl}/games/game-1/reservations`, {}).subscribe({
+      error: (error: unknown) => {
+        receivedStatus = error instanceof HttpErrorResponse ? error.status : null;
+      },
+    });
+    http.expectOne(`${apiBaseUrl}/games/game-1/reservations`).flush(
+      {
+        error: 'email_not_verified',
+        message: 'Debes verificar tu correo.',
+        reason: 'email_not_verified',
+      },
+      { status: 403, statusText: 'Forbidden' },
+    );
+
+    expect(receivedStatus).toBe(403);
+    expect(session.clearSession).not.toHaveBeenCalled();
+    expect(navigateByUrlSpy).not.toHaveBeenCalled();
   });
 
   it('does not redirect again when already on login', () => {

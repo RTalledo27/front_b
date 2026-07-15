@@ -99,6 +99,49 @@ describe('player-commerce.mapper', () => {
     expect(reservation.gameNumber.game?.slug).toBe('bingo-fortuna');
     expect(entry.gameNumber?.number).toBe(7);
     expect(entry.confirmedAt).toBe('2026-06-25T13:00:00Z');
+    expect(entry.liveProgress).toBeNull();
+  });
+
+  it('maps nullable live progress fields and ignores additive backend fields', () => {
+    const entry = mapPlayerEntry({
+      id: 'entry-1',
+      game_id: 'game-1',
+      game_number_id: 'gn-7',
+      status: 'confirmed',
+      confirmed_at: null,
+      game: { id: 'game-1', slug: 'bingo-fortuna', name: 'Bingo Fortuna' },
+      game_number: { id: 'gn-7', number: 7, status: 'sold' },
+      live_progress: {
+        entry_id: 'entry-1',
+        game_id: 'game-1',
+        game_status: 'running',
+        game_number: 7,
+        hits_current: 0,
+        hits_required: null,
+        latest_draw_number: null,
+        latest_draw_sequence: null,
+        is_winner: false,
+        completed_at: null,
+        won_at: null,
+        future_additive_field: 'ignored',
+      },
+      future_entry_field: { safely: 'ignored' },
+    });
+
+    expect(entry.confirmedAt).toBeNull();
+    expect(entry.liveProgress).toEqual({
+      entryId: 'entry-1',
+      gameId: 'game-1',
+      gameStatus: 'running',
+      gameNumber: 7,
+      hitsCurrent: 0,
+      hitsRequired: null,
+      latestDrawNumber: null,
+      latestDrawSequence: null,
+      isWinner: false,
+      completedAt: null,
+      wonAt: null,
+    });
   });
 
   it('maps the paginated orders response using the real Laravel meta shape', () => {

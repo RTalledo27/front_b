@@ -22,7 +22,11 @@ export const authErrorInterceptor: HttpInterceptorFn = (request, next) => {
           if (redirects.shouldRedirectToLogin(currentUrl)) {
             redirects.redirectToLogin(router, currentUrl);
           }
-        } else if (error.status === 403 && !redirects.isForbiddenRoute(router.url)) {
+        } else if (
+          error.status === 403 &&
+          !isFeatureOwnedForbidden(error) &&
+          !redirects.isForbiddenRoute(router.url)
+        ) {
           redirects.redirectToForbidden(router);
         }
       }
@@ -30,3 +34,12 @@ export const authErrorInterceptor: HttpInterceptorFn = (request, next) => {
     }),
   );
 };
+
+function isFeatureOwnedForbidden(error: HttpErrorResponse): boolean {
+  if (typeof error.error !== 'object' || error.error === null) {
+    return false;
+  }
+
+  const payload = error.error as Record<string, unknown>;
+  return payload['error'] === 'email_not_verified' || payload['reason'] === 'email_not_verified';
+}

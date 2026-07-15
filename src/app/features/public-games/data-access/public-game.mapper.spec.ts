@@ -77,6 +77,21 @@ describe('public game mapper', () => {
     expect(game.lifecycle.completedAt).toBe('2026-06-21T21:30:00Z');
   });
 
+  it('maps optional live fields as absent without being affected by additive fields', () => {
+    const payload = {
+      ...gameDto,
+      lifecycle: undefined,
+      latest_draw: undefined,
+      winner: undefined,
+      additive_backend_field: 'ignored',
+    };
+    const game = mapPublicGame(payload);
+
+    expect(game.lifecycle).toEqual({ startedAt: null, pausedAt: null, completedAt: null });
+    expect(game.latestDraw).toBeNull();
+    expect(game.winner).toBeNull();
+  });
+
   it('preserves Laravel pagination metadata', () => {
     const response: LaravelPaginatedResponse<PublicGameApiDto> = {
       data: [gameDto],
@@ -97,5 +112,25 @@ describe('public game mapper', () => {
 
     expect(page.games).toHaveLength(1);
     expect(page.pageInfo).toEqual({ currentPage: 1, lastPage: 3, perPage: 12, total: 25 });
+  });
+
+  it('preserves an honest empty page without synthetic games', () => {
+    const page = mapPublicGamesPage({
+      data: [],
+      links: { first: null, last: null, prev: null, next: null },
+      meta: {
+        current_page: 1,
+        from: null,
+        last_page: 1,
+        links: [],
+        path: '/games',
+        per_page: 12,
+        to: null,
+        total: 0,
+      },
+    });
+
+    expect(page.games).toEqual([]);
+    expect(page.pageInfo.total).toBe(0);
   });
 });

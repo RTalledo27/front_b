@@ -60,6 +60,13 @@ import { GameNumberOption } from '../../models/game-number.models';
           <aside class="refresh-notice" role="status" aria-live="polite">
             Actualizamos la disponibilidad con el estado más reciente del backend.
           </aside>
+        } @else if (facade.viewError() && facade.numbers().length > 0) {
+          <aside class="refresh-notice" role="status" aria-live="polite">
+            No pudimos actualizar la disponibilidad: {{ facade.viewError()?.message }} Conservamos la última grilla visible.
+            <button class="clear-button" type="button" (click)="facade.refreshAvailability()">
+              Reintentar actualización
+            </button>
+          </aside>
         }
 
         @if (facade.liveMessage()) {

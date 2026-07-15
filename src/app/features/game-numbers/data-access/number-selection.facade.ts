@@ -103,7 +103,7 @@ export class NumberSelectionFacade {
           this.game.set(game);
           this.loadAvailability(game.slug, version, false);
         },
-        error: (error: unknown) => this.handleViewError(error, version),
+        error: (error: unknown) => this.handleViewError(error, version, false),
       });
   }
 
@@ -234,6 +234,7 @@ export class NumberSelectionFacade {
             return;
           }
 
+          this.viewError.set(null);
           this.numbers.set(availability.numbers);
 
           if (preserveSelection) {
@@ -244,17 +245,23 @@ export class NumberSelectionFacade {
 
           this.viewStatus.set('loaded');
         },
-        error: (error: unknown) => this.handleViewError(error, version),
+        error: (error: unknown) => this.handleViewError(error, version, preserveSelection),
       });
   }
 
-  private handleViewError(error: unknown, version: number): void {
+  private handleViewError(error: unknown, version: number, preserveData: boolean): void {
     if (version !== this.loadVersion) {
       return;
     }
 
     const apiError = toApiError(error);
     this.viewError.set(apiError);
+
+    if (preserveData && this.game() !== null && this.numbers().length > 0) {
+      this.viewStatus.set('loaded');
+      return;
+    }
+
     this.viewStatus.set(apiError.status === 0 ? 'networkError' : 'unexpectedError');
   }
 
@@ -315,7 +322,7 @@ export class NumberSelectionFacade {
       this.idempotency.clear();
       this.reservationStatus.set('conflict');
       this.liveMessage.set(
-        'La clave idempotente dejó de ser válida para esta selección. Actualizamos la grilla.',
+        'La clave idempotente dejó de ser válida para esta selección. Intentamos actualizar la grilla.',
       );
       this.refreshAvailability();
       return;
@@ -333,7 +340,7 @@ export class NumberSelectionFacade {
       this.idempotency.clear();
       this.reservationStatus.set('conflict');
       this.liveMessage.set(
-        'Uno o más números ya no están disponibles. Actualizamos la grilla.',
+        'Uno o más números ya no están disponibles. Intentamos actualizar la grilla.',
       );
       this.refreshAvailability();
       return;
